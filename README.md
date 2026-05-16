@@ -192,6 +192,16 @@ git remote add origin git@github.com:<owner>/<repo>.git
 git push -u origin main
 ```
 
+## License
+
+The original Mono Hydra ROS 2 integration code in this repository is released
+under the MIT License; see [LICENSE](LICENSE). This does not relicense vendored
+upstream code. MIT SPARK Hydra and the other third-party projects under
+`mono_hydra_utils`, plus R-VIO2/vocabulary-derived components under
+`mono_hydra_vio`, retain their upstream licenses. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the license files in each
+vendored source directory.
+
 ## Acknowledgements and Citation
 
 This work builds on major open-source robotics systems:
