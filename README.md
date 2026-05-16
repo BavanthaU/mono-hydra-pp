@@ -73,11 +73,11 @@ ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
   perception_checkpoint_path:=/path/to/m2h_hmx_large.pt
 ```
 
-Loop-closure detection also needs the ORB vocabulary expanded locally:
+Loop-closure detection also needs the ORB vocabulary installed locally. The
+archive and expanded vocabulary are intentionally ignored by Git:
 
 ```bash
-cd src/mono_hydra_vio/vocabulary
-unzip ORBvoc.zip
+src/mono_hydra_vio/scripts/download_orb_vocabulary.sh
 ```
 
 ## Build
@@ -117,14 +117,13 @@ Terminal 2:
 cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
-  --clock --rate 0.2 --qos-profile-overrides-path \
+  --clock --qos-profile-overrides-path \
   "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
   --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
 ```
 
-Use the slower `--rate 0.2` playback for the full PyTorch model unless the GPU
-has been validated to keep up. ONNX inference remains available only when
-explicitly requested:
+The reference runs use normal bag timing. ONNX inference remains available only
+when explicitly requested:
 
 ```bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \

@@ -147,6 +147,11 @@ install(PROGRAMS mono_hydra_vio/kimera_pose_graph_bridge_node.py
   RENAME kimera_pose_graph_bridge_node
 )
 
+install(PROGRAMS scripts/download_orb_vocabulary.sh
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME download_orb_vocabulary
+)
+
 install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )

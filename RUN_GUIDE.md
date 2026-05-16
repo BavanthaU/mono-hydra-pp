@@ -44,6 +44,12 @@ mono_hydra/rviz/
 mono_hydra/ros1_reference/
 ```
 
+The ORB vocabulary is downloaded locally and is not committed to Git:
+
+```bash
+src/mono_hydra_vio/scripts/download_orb_vocabulary.sh
+```
+
 Key benchmark parameter folders:
 
 ```text
@@ -136,15 +142,13 @@ Terminal 2:
 cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
-  --clock --rate 0.2 --qos-profile-overrides-path \
+  --clock --qos-profile-overrides-path \
   "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
   --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
 ```
 
-Use `--rate 0.2` for the full PyTorch model unless you have confirmed the GPU can
-publish M2H depth/labels faster. Full-speed playback with full-model inference can
-starve RGBD synchronization and produce a sparse pose graph. ONNX test runs can
-usually be played faster, but ONNX is still opt-in via `perception_backend:=onnx`.
+The reference commands use normal bag timing. ONNX remains opt-in via
+`perception_backend:=onnx`; the full model is the default path.
 
 ## uHumans2 Run
 
@@ -317,8 +321,9 @@ wc -l output/<sequence_name>/backend/loop_closures.csv
 ```
 
 The important sanity check is `trajectory_len`: it should be in the ROS 1 range
-of roughly 1690-1800 for the ITC full loop. A value near 250 means the full-model
-perception stream was still too slow for the selected bag playback rate.
+of roughly 1690-1800 for the ITC full loop. A much smaller value means the RGB,
+depth, semantic, odometry, and pose-graph streams are not staying synchronized
+through the complete loop.
 
 For a complete scene graph in RViz, the expected marker namespaces include:
 

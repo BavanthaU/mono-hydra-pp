@@ -94,7 +94,7 @@ Benchmark-matched assets imported from ROS 1:
 
 ```text
 params/
-vocabulary/ORBvoc.yml
+vocabulary/ORBvoc.yml  generated locally by scripts/download_orb_vocabulary.sh
 rviz/
 ros1_reference/
 ```

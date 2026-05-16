@@ -92,7 +92,7 @@ Play the converted bag:
 
 ```bash
 ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
-  --clock --rate 0.2 --qos-profile-overrides-path \
+  --clock --qos-profile-overrides-path \
   "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
   --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
 ```

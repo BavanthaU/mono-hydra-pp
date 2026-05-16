@@ -58,7 +58,9 @@ venv/
 *.a
 *.dylib
 *.dll
+mono_hydra_vio/vocabulary/ORBvoc.zip
 mono_hydra_vio/vocabulary/ORBvoc.yml
+mono_hydra_vio/vocabulary/ORBvoc/
 mono_hydra_vio/ros1_reference/**/vocabulary/
 mono_hydra_vio/ros1_reference/**/third_party/onnxruntime-*/
 
