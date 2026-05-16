@@ -21,7 +21,7 @@ images                  paper and README figures
 ```
 
 This repository is intended to be cloned as the `src/` directory of a ROS 2
-workspace so GitHub opens directly on the main packages:
+workspace:
 
 ```bash
 mkdir -p ~/mono_hydra_ros2_ws
@@ -152,43 +152,6 @@ superpoint_keypoint_mask_topic
 use_temporal_alignment
 kimera_do_coarse_imu_camera_temporal_sync
 kimera_do_fine_imu_camera_temporal_sync
-```
-
-## Runtime Checks
-
-```bash
-ros2 topic hz /camera/depth_cam/image_raw
-ros2 topic hz /camera/seg_cam/labels_argmax
-ros2 topic hz /mono_hydra_perception/synced/image_raw
-ros2 topic hz /mono_hydra_vio/odometry
-ros2 topic info -v /mono_hydra_vio_ros/pose_graph_incremental
-ros2 topic echo --once /hydra_dsg_visualizer/dsg_markers \
-  --qos-durability transient_local --qos-reliability reliable --no-arr
-ros2 run tf2_tools view_frames
-```
-
-After a full ITC loop, check Hydra PGMO density:
-
-```bash
-tail -n 1 output/itc_full_loop/backend/pgmo/dsg_pgmo_status.csv
-```
-
-The `trajectory_len` should be close to the ROS 1 full-loop scale rather than a
-sparse partial run.
-
-## Preparing the GitHub Repository
-
-Generated products, bags, logs, local environments, and model artifacts are
-ignored. The source tree is ready for a normal single-repository push:
-
-```bash
-git init
-git add .
-git status
-git commit -m "Initial Mono Hydra ROS 2 release"
-git branch -M main
-git remote add origin git@github.com:<owner>/<repo>.git
-git push -u origin main
 ```
 
 ## License
