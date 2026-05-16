@@ -1,0 +1,27 @@
+---
+total_semantic_labels: 20  # ScanNet20: 0-based, no unknown (0 == wall)
+dynamic_labels: []         # no dedicated dynamic labels in ScanNet20
+invalid_labels: []
+object_labels: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+surface_places_labels: [0, 1]
+label_names:
+  - {label: 0,  name: wall}
+  - {label: 1,  name: floor}
+  - {label: 2,  name: cabinet}
+  - {label: 3,  name: bed}
+  - {label: 4,  name: chair}
+  - {label: 5,  name: sofa}
+  - {label: 6,  name: table}
+  - {label: 7,  name: door}
+  - {label: 8,  name: window}
+  - {label: 9,  name: bookshelf}
+  - {label: 10, name: picture}
+  - {label: 11, name: counter}
+  - {label: 12, name: desk}
+  - {label: 13, name: curtain}
+  - {label: 14, name: refrigerator}
+  - {label: 15, name: shower curtain}
+  - {label: 16, name: toilet}
+  - {label: 17, name: sink}
+  - {label: 18, name: bathtub}
+  - {label: 19, name: otherfurniture}

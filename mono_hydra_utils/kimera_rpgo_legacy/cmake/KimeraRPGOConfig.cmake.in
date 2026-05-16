@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+
+get_filename_component(KimeraRPGO_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+find_dependency(GTSAM REQUIRED)
+
+if(NOT TARGET KimeraRPGO)
+  include("${KimeraRPGO_CMAKE_DIR}/KimeraRPGOTargets.cmake")
+endif()
+
+set(KimeraRPGO_LIBRARIES KimeraRPGO)
+check_required_components(KimeraRPGO)

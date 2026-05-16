@@ -1,0 +1,18 @@
+%YAML:1.0
+# RVIO2 side-test odometry for ITC.
+# The bridge publishes world_T_body already, so T_BS stays identity here.
+T_BS:
+  cols: 4
+  rows: 4
+  data: [1.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
+rate_hz: 20
+
+# Treat RVIO2 as the trusted motion prior for this side experiment.
+odomPositionPrecision: 1.0e6
+odomRotationPrecision: 1.0e6
+# RVIO2 path output does not provide a reliable world-frame velocity prior.
+odomVelPrecision: 0.0
+odomTimeShift: 0.0

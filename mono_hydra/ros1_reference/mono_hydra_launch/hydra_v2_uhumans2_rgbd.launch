@@ -1,0 +1,70 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="config_dir" default="$(find mono_hydra)/config/uhumans2"/>
+    <arg name="use_gt_frame" default="false" doc="use bag world->base_link_gt tf instead of VIO outputs"/>
+    <arg name="color_mesh_by_label" default="true" doc="display mesh colored by semantic label"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="use_2d_places" default="true"/>
+    <arg name="use_single_channel_label_image" default="true"/>
+    <arg name="use_gt_depth" default="false" doc="use bag GT depth instead of M2H depth"/>
+    <arg name="use_gt_semantics" default="false" doc="use bag GT labels instead of M2H ScanNet labels"/>
+    <arg name="use_pose_graph_from_odom" default="false"
+         doc="build Hydra agent nodes directly from odom TF instead of a pose_graph topic"/>
+    <arg name="start_visualizer" default="true"/>
+    <arg name="rviz_dir" default="$(find mono_hydra)/rviz"/>
+    <arg name="rviz_file" default="uHumans_m2h.rviz"/>
+    <arg name="tf_wait_duration_s" default="0.05" doc="wall-time wait between Hydra TF lookup retries"/>
+    <arg name="tf_max_tries" default="80" doc="Hydra TF lookup retries before dropping an input packet"/>
+    <arg name="tf_buffer_size_s" default="30.0" doc="Hydra TF buffer size in seconds"/>
+
+    <arg name="zmq_ip" default="127.0.0.1"/>
+    <arg name="zmq_send_url" default="tcp://$(arg zmq_ip):8003"/>
+    <arg name="zmq_recv_url" default="tcp://$(arg zmq_ip):8004"/>
+
+    <arg name="robot_frame" default="$(eval 'base_link_gt' if arg('use_gt_frame') else 'base_link_kimera')" doc="robot body tf frame"/>
+    <arg name="odom_frame" default="world" doc="odometry frame"/>
+    <arg name="sensor_frame" default="$(eval 'left_cam' if arg('use_gt_frame') else 'left_cam_kimera')" doc="camera frame"/>
+
+    <arg name="sensor_min_range" default="0.1" doc="minimum sensor range in meters"/>
+    <arg name="sensor_max_range" default="8.0" doc="maximum sensor range in meters"/>
+
+    <arg name="labelspace_name" default="scannet20_uhumans2"/>
+    <arg name="semantic_map_dir" default="$(find m2h_hmx_large)/config/colors"/>
+    <arg name="semantic_map_file" default="$(arg labelspace_name).csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <arg name="semantic_label_remap_filepath"
+         default="$(find hydra)/config/label_remaps/uhumans2_office_scannet20_remap.yaml"
+         if="$(arg use_gt_semantics)"/>
+    <arg name="semantic_label_remap_filepath"
+         default=""
+         unless="$(arg use_gt_semantics)"/>
+
+    <arg name="labelspace_dir" default="$(find m2h_hmx_large)/config/label_spaces"/>
+    <arg name="labelspace_path" default="$(arg labelspace_dir)/$(arg labelspace_name)_label_space.yaml"/>
+
+    <arg name="dataset_name" default="uhumans2"/>
+    <arg name="dataset_config_name" default="uhumans2"/>
+    <arg name="sequence_name" default="uHumans2_office_s1_00h"/>
+    <arg name="dsg_output_dir" default="$(find mono_hydra)/output/$(arg dataset_name)"/>
+    <arg name="dsg_output_prefix" default="$(arg sequence_name)"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+
+    <arg name="rgb_topic" default="/tesse/left_cam/rgb/image_raw"/>
+    <arg name="rgb_info_topic" default="/tesse/left_cam/camera_info"/>
+    <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw" if="$(arg use_gt_depth)"/>
+    <arg name="depth_topic" default="/tesse/m2h/depth/image_raw" unless="$(arg use_gt_depth)"/>
+    <arg name="label_topic" default="/tesse/seg_cam/labels_argmax" if="$(arg use_gt_semantics)"/>
+    <arg name="label_topic" default="/m2h_hmx_large/labels_argmax" unless="$(arg use_gt_semantics)"/>
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+        <arg name="rviz_file" value="$(arg rviz_file)"/>
+        <arg name="rviz_dir" value="$(arg rviz_dir)"/>
+        <arg name="input_config_path" value="$(find mono_hydra)/config/datasets/$(arg dataset_config_name).yaml"/>
+        <arg name="zmq_send_url" value="$(arg zmq_send_url)"/>
+        <arg name="zmq_recv_url" value="$(arg zmq_recv_url)"/>
+        <arg name="pose_graph_tracker_type"
+             value="$(eval 'PoseGraphFromOdom' if arg('use_pose_graph_from_odom') else ('PoseGraphFromOdom' if arg('use_gt_frame') else 'RosPoseGraphs'))"/>
+    </include>
+</launch>

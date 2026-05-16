@@ -1,0 +1,33 @@
+mono_hydra_vio_odom_adapter:
+  ros__parameters:
+    use_sim_time: true
+    input_odom_topic: /external_odometry
+    rvio2_trajectory_topic: /rvio2/trajectory
+    output_odom_topic: /mono_hydra_vio/odometry
+    output_path_topic: /mono_hydra_vio/path
+    use_rvio2_bridge: false
+    publish_bridge_external_odom: true
+    publish_tf: true
+    publish_camera_tf: false
+    publish_map_tf: false
+    map_frame_id: map
+    odom_frame_id: scannet_world
+    base_link_frame_id: base_link_kimera
+    camera_frame_id: scannet_camera
+    path_max_length: 2000
+    force_frame_ids: false
+
+mono_hydra_vio_feature_interface:
+  ros__parameters:
+    use_sim_time: true
+    enable_sparse_depth: false
+    dense_depth_topic: /camera/depth_cam/image_raw
+    semantic_label_topic: /camera/seg_cam/labels_argmax
+    semantic_mask_topic: /mono_hydra_vio/semantic_feature_mask
+    semantic_mask_inflate_px: 8
+    semantic_reject_labels: [0]
+    sparse_depth_topic: /mono_hydra_vio/sparse_depth
+    sparse_depth_stride: 16
+    sparse_depth_min_m: 0.05
+    sparse_depth_max_m: 8.0
+    superpoint_keypoint_mask_topic: ""

@@ -1,0 +1,94 @@
+<launch>
+  <!-- VIO-only uHumans2 ablation wrapper.
+       Run this in its own terminal so Kimera errors are easy to see.
+       M2H and Hydra are intentionally separate processes. -->
+
+  <arg name="mask_source" default="none" doc="none, m2h, or gt"/>
+  <arg name="use_sparse_depth_factors" default="false"/>
+  <arg name="sequence_name" default="uHumans2_office_s1_00h"/>
+
+  <arg name="online" default="true"/>
+  <arg name="use_lcd" default="true"/>
+  <arg name="lcd_no_optimize" default="true"/>
+  <arg name="lcd_no_detection" default="false"/>
+  <arg name="use_external_odom" default="false"/>
+  <arg name="external_odom_topic" default="/external_odometry"/>
+  <arg name="viz_type" default="1"/>
+  <!-- Keep true. If false, Kimera falls back to the OpenCV display factory. -->
+  <arg name="use_rviz" default="true"/>
+  <arg name="visualize" default="true"/>
+
+  <arg name="left_cam_topic" default="/tesse/left_cam/mono/image_raw"/>
+  <arg name="depth_cam_topic" default="/tesse/m2h/depth/image_raw"/>
+  <arg name="m2h_label_topic" default="/m2h_hmx_large/labels_argmax"/>
+  <arg name="m2h_semantic_labelspace_file"
+       default="$(find m2h_hmx_large)/config/label_spaces/nyud20_config_label_space.yaml"/>
+  <arg name="gt_rgb_semantic_topic" default="/tesse/seg_cam/rgb/image_raw"/>
+  <arg name="gt_label_topic" default="/tesse/seg_cam/labels_argmax"/>
+  <arg name="gt_semantic_colormap"
+       default="$(find hydra_ros)/config/color/uhumans2_office.csv"/>
+  <arg name="semantic_mask_is_label_image" default="true"/>
+  <arg name="semantic_mask_inflate_px" default="8"/>
+
+  <arg if="$(eval arg('use_sparse_depth_factors') and not arg('use_external_odom'))"
+       name="params_dataset_name"
+       value="uHumans2_RGBD_depth_factors_on"/>
+  <arg if="$(eval (not arg('use_sparse_depth_factors')) and not arg('use_external_odom'))"
+       name="params_dataset_name"
+       value="uHumans2_RGBD_depth_factors_off"/>
+  <arg if="$(eval arg('use_sparse_depth_factors') and arg('use_external_odom'))"
+       name="params_dataset_name"
+       value="uHumans2_RGBD_RVIO2_depth_factors_on"/>
+  <arg if="$(eval (not arg('use_sparse_depth_factors')) and arg('use_external_odom'))"
+       name="params_dataset_name"
+       value="uHumans2_RGBD_RVIO2_depth_factors_off"/>
+
+  <arg if="$(eval arg('mask_source') == 'none')"
+       name="semantic_mask_topic"
+       value=""/>
+  <arg if="$(eval arg('mask_source') == 'm2h')"
+       name="semantic_mask_topic"
+       value="$(arg m2h_label_topic)"/>
+  <arg if="$(eval arg('mask_source') == 'gt')"
+       name="semantic_mask_topic"
+       value="$(arg gt_label_topic)"/>
+
+  <arg if="$(eval arg('mask_source') == 'm2h')"
+       name="semantic_labelspace_file"
+       value="$(arg m2h_semantic_labelspace_file)"/>
+  <arg unless="$(eval arg('mask_source') == 'm2h')"
+       name="semantic_labelspace_file"
+       value="$(find hydra)/config/label_spaces/uhumans2_office_label_space.yaml"/>
+
+  <node pkg="hydra_ros"
+        type="semantic_rgb_to_labels.py"
+        name="uhumans2_semantic_rgb_to_labels"
+        output="screen"
+        if="$(eval arg('mask_source') == 'gt')">
+    <param name="input" value="$(arg gt_rgb_semantic_topic)"/>
+    <param name="output" value="$(arg gt_label_topic)"/>
+    <param name="colormap_csv" value="$(arg gt_semantic_colormap)"/>
+    <param name="unknown_label" value="0"/>
+  </node>
+
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros_uhumans2_office_rgbd.launch">
+    <arg name="params_dataset_name" value="$(arg params_dataset_name)"/>
+    <arg name="output_dataset_name" value="uHumans2_RGBD"/>
+    <arg name="sequence_name" value="$(arg sequence_name)"/>
+    <arg name="online" value="$(arg online)"/>
+    <arg name="use_lcd" value="$(arg use_lcd)"/>
+    <arg name="lcd_no_optimize" value="$(arg lcd_no_optimize)"/>
+    <arg name="lcd_no_detection" value="$(arg lcd_no_detection)"/>
+    <arg name="use_external_odom" value="$(arg use_external_odom)"/>
+    <arg name="external_odom_topic" value="$(arg external_odom_topic)"/>
+    <arg name="viz_type" value="$(arg viz_type)"/>
+    <arg name="use_rviz" value="$(arg use_rviz)"/>
+    <arg name="visualize" value="$(arg visualize)"/>
+    <arg name="left_cam_topic" value="$(arg left_cam_topic)"/>
+    <arg name="depth_cam_topic" value="$(arg depth_cam_topic)"/>
+    <arg name="semantic_mask_topic" value="$(arg semantic_mask_topic)"/>
+    <arg name="semantic_mask_is_label_image" value="$(arg semantic_mask_is_label_image)"/>
+    <arg name="semantic_mask_inflate_px" value="$(arg semantic_mask_inflate_px)"/>
+    <arg name="semantic_labelspace_file" value="$(arg semantic_labelspace_file)"/>
+  </include>
+</launch>

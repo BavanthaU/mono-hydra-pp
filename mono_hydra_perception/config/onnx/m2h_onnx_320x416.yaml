@@ -1,0 +1,33 @@
+model_path: "$(find mono_hydra_perception)/onnx_models/scannet_depth_sem_320x416.onnx"
+
+input_topic: "/camera/image_raw"
+depth_topic: "/m2h/depth/image"
+semantic_topic: "/m2h/semantic/image"
+semantic_color_topic: "/m2h/semantic/color"
+
+input_width: 416
+input_height: 320
+input_color_order: "rgb"
+model_expects_rgb: true
+
+scale_input_to_01: true
+normalize_mean: [0.485, 0.456, 0.406]
+normalize_std: [0.229, 0.224, 0.225]
+
+output_original_size: true
+
+publish_semantic_color: true
+
+num_classes: 20
+semantic_encoding: "mono8"
+
+depth_output_name: ""
+semantic_output_name: ""
+
+depth_scale: 1.0
+depth_min: 0.0
+depth_max: 10.0
+
+inference_provider: "auto"
+skip_frequency: 3
+log_every_n_frames: 30

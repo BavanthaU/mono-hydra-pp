@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>kimera_rpgo_legacy</name>
+  <version>1.0.0</version>
+  <description>Legacy Kimera-RPGO API used by the benchmarked Kimera VIO LCD path.</description>
+
+  <maintainer email="bavanthau@eng.pdn.ac.lk">Bavantha Udugama</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+
+  <depend>gtsam</depend>
+
+  <export>
+    <!-- Specify that this is not really a catkin package-->
+    <build_type>cmake</build_type>
+  </export>
+</package>

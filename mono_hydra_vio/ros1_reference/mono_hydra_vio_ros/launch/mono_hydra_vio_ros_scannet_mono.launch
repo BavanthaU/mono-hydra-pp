@@ -1,0 +1,58 @@
+<launch>
+  <arg name="dataset_name" value="ScanNet"/>
+
+  <arg name="online" default="true" />
+  <arg name="log_output" default="true"/>
+  <arg name="verbosity" default="0"/>
+  <arg name="debug" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+
+  <arg name="use_lcd" default="true"/>
+  <arg name="viz_type" default="1"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="publish_tf" default="true"/>
+  <arg name="semantic_labelspace_file"
+       default="$(find mono_hydra)/config/label_spaces/scannet20_label_space.yaml"/>
+
+  <!-- Subscribed Topics -->
+  <arg name="left_cam_topic" default="/camera/color/image_raw"/>
+  <arg name="depth_cam_topic" default="/camera/depth_cam/image_raw"/>
+  <arg name="semantic_mask_topic" default=""/>
+  <arg name="imu_topic" default="/imu/aligned"/>
+  <arg name="use_external_odom" default="true"/>
+  <arg name="external_odom_topic" default="/external_odometry"/>
+
+  <!-- Frame IDs -->
+  <arg name="odom_frame_id" default="odom"/>
+  <arg name="base_link_frame_id" default="base_link_kimera"/>
+  <arg name="map_frame_id" default="map"/>
+  <arg name="left_cam_frame_id" default="scannet_camera"/>
+  <arg name="right_cam_frame_id" default="right_cam"/>
+
+  <arg name="log_path" value="$(find mono_hydra_vio_ros)/output_logs/$(arg dataset_name)"/>
+
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros.launch" pass_all_args="true">
+      <!-- Options -->
+      <arg name="include_pipeline_flags" value="true"/>
+      <arg name="viz_type" value="$(arg viz_type)"/>
+      <arg name="use_rviz" value="$(arg use_rviz)"/> 
+      <arg name="publish_tf" value="$(arg publish_tf)"/>
+      <!-- Other settings -->
+      <arg name="log_gt_data" value="false"/>
+      <arg if="$(arg log_output)" name="log_output_path" value="$(arg log_path)"/>
+      <!-- Subscribed Topics -->
+      <arg name="left_cam_topic" value="$(arg left_cam_topic)"/>
+      <arg name="depth_cam_topic" value="$(arg depth_cam_topic)"/>
+      <arg name="semantic_mask_topic" value="$(arg semantic_mask_topic)"/>
+      <arg name="imu_topic" value="$(arg imu_topic)"/>
+      <arg name="use_external_odom" value="$(arg use_external_odom)"/>
+      <arg name="external_odom_topic" value="$(arg external_odom_topic)"/>
+      <arg name="semantic_labelspace_file" value="$(arg semantic_labelspace_file)"/>
+      <!-- Frame IDs -->
+      <arg name="odom_frame_id" value="$(arg odom_frame_id)"/>
+      <arg name="base_link_frame_id" value="$(arg base_link_frame_id)"/>
+      <arg name="map_frame_id" value="$(arg map_frame_id)"/>
+      <arg name="left_cam_frame_id" value="$(arg left_cam_frame_id)"/>
+      <arg name="right_cam_frame_id" value="$(arg right_cam_frame_id)"/>
+  </include>
+</launch>

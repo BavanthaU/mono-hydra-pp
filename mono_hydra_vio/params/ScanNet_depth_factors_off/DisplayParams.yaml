@@ -1,0 +1,5 @@
+%YAML:1.0
+
+# OpenCV Display params.
+hold_2d_display: 0
+hold_3d_display: 0

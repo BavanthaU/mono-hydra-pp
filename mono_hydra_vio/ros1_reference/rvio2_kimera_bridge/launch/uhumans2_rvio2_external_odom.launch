@@ -1,0 +1,38 @@
+<launch>
+  <arg name="rvio_config"
+       default="$(find rvio2_kimera_bridge)/config/uhumans2_office_720x480.yaml"/>
+  <arg name="image_topic" default="/tesse/left_cam/mono/image_raw"/>
+  <arg name="imu_topic" default="/tesse/imu/clean/imu"/>
+  <arg name="external_odom_topic" default="/external_odometry"/>
+  <arg name="left_camera_params_path"
+       default="$(find mono_hydra_vio)/params/uHumans2_RGBD/LeftCameraParams.yaml"/>
+  <arg name="world_frame_id" default="world"/>
+  <arg name="body_frame_id" default="base_link_kimera"/>
+  <!-- RVIO2 publishes q_kG/p_Gk, i.e. world_T_body, on /rvio2/trajectory. -->
+  <arg name="input_pose_frame" default="body"/>
+  <arg name="publish_velocity" default="false"/>
+  <arg name="publish_tf" default="true"/>
+
+  <node pkg="rvio2"
+        type="rvio2_mono_node"
+        name="rvio2_mono_node"
+        args="$(arg rvio_config)"
+        output="screen">
+    <remap from="/cam0/image_raw" to="$(arg image_topic)"/>
+    <remap from="/imu0" to="$(arg imu_topic)"/>
+  </node>
+
+  <node pkg="rvio2_kimera_bridge"
+        type="rvio2_path_to_odometry.py"
+        name="rvio2_path_to_odometry"
+        output="screen">
+    <param name="trajectory_topic" value="/rvio2/trajectory"/>
+    <param name="odometry_topic" value="$(arg external_odom_topic)"/>
+    <param name="left_camera_params_path" value="$(arg left_camera_params_path)"/>
+    <param name="world_frame_id" value="$(arg world_frame_id)"/>
+    <param name="body_frame_id" value="$(arg body_frame_id)"/>
+    <param name="input_pose_frame" value="$(arg input_pose_frame)"/>
+    <param name="publish_velocity" value="$(arg publish_velocity)"/>
+    <param name="publish_tf" value="$(arg publish_tf)"/>
+  </node>
+</launch>

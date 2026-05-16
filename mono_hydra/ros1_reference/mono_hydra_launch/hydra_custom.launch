@@ -1,0 +1,64 @@
+<launch>
+    <arg name="sim_time_required" default="false"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <!-- configure Kimera VIO -->
+    <arg name="use_gt_frame" default="true"/>
+
+    <!-- pointcloud for hydra: no need to change -->
+    <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+
+    <!-- Replace these with your actual sensor information -->
+    <!-- <arg name="sensor_frame" default="left_cam"/> -->
+    <!-- updated to suit kimera VIO -->
+    <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="left_cam_kimera" unless="$(arg use_gt_frame)"/>
+
+    <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
+    <!-- These should point to a 2D semantic segmentation image -->
+    <arg name="semantic_info_topic" default="/tesse/seg_cam/camera_info"/>
+    <arg name="semantic_topic" default="/tesse/seg_cam/rgb/image_raw"/>
+
+    <!-- semantic configuration -->
+    <arg name="semantic_map_path" default="$(find kimera_semantics_ros)/cfg/ade150_config.csv"/>
+    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/uhumans2"/>
+    <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
+
+    <!-- see uhumans2 launch file for how these are used -->
+    <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/uhumans2"/>
+    <arg name="dsg_output_prefix" default="office"/>
+
+    <!-- good starter rviz file, though topics could be edited for images -->
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_file" default="uhumans2.rviz"/>
+
+    <!-- turns rgb (or 2D semantics) + depth into pointcloud -->
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="rgb_info_topic" value="$(arg semantic_info_topic)"/>
+        <arg name="rgb_topic" value="$(arg semantic_topic)"/>
+        <arg name="depth_topic" value="$(arg depth_topic)"/>
+        <arg name="pointcloud_topic" value="$(arg pointcloud_topic)"/>
+    </include>
+
+    <!-- performs reconstruction and extracts places -->
+    <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
+        <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
+        <arg name="config" value="uhumans2_topology_config.yaml"/>
+        <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
+        <arg name="config_dir" value="$(find hydra_topology)/config"/>
+        <arg name="debug" value="false"/>
+        <!-- play with limits -->
+        <arg name="voxel_size" default="0.10"/>
+        <arg name="max_ray_length_m" default="4.5"/>
+        <arg name="update_period_s" default="0.5"/>
+    </include>
+
+    <!-- constructs rest of scene graph from reconstruction and places -->
+    <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true">
+        <arg name="robot_id" value="0"/>
+        <arg name="use_oriented_bounding_boxes" value="true"/>
+        <arg name="config_dir" value="$(find hydra_dsg_builder)/config/uhumans2"/>
+    </include>
+
+</launch>
+

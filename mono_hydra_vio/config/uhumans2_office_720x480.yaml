@@ -1,0 +1,95 @@
+%YAML:1.0
+
+# RVIO2 config for the uHumans2 office mono + IMU stream.
+
+#--------------------------------------------------------------------------------------------
+# IMU Parameters
+#--------------------------------------------------------------------------------------------
+IMU.dps: 200
+IMU.sigma_g: 1.6968e-04
+IMU.sigma_wg: 1.9393e-05
+IMU.sigma_a: 2.0000e-3
+IMU.sigma_wa: 3.0000e-3
+IMU.nG: 9.81
+IMU.nSmallAngle: 0.001745329
+
+#--------------------------------------------------------------------------------------------
+# Camera Parameters
+#--------------------------------------------------------------------------------------------
+Camera.fps: 20
+Camera.width: 720
+Camera.height: 480
+Camera.RGB: 0
+Camera.Fisheye: 0
+Camera.fx: 415.69219381653056
+Camera.fy: 415.69219381653056
+Camera.cx: 360.0
+Camera.cy: 240.0
+Camera.k1: 0
+Camera.k2: 0
+Camera.p1: 0
+Camera.p2: 0
+Camera.sigma_px: 0.001632477
+Camera.sigma_py: 0.001634684
+
+Camera.T_BC0_GT: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [0.0,  0.0, 1.0, 0.0,
+          -1.0,  0.0, 0.0, 0.05,
+           0.0, -1.0, 0.0, 0.0,
+           0.0,  0.0, 0.0, 1.0]
+
+Camera.T_BC0: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [0.0,  0.0, 1.0, 0.0,
+          -1.0,  0.0, 0.0, 0.05,
+           0.0, -1.0, 0.0, 0.0,
+           0.0,  0.0, 0.0, 1.0]
+
+Camera.nTimeOffset_GT: 0
+Camera.nTimeOffset: 0
+
+#--------------------------------------------------------------------------------------------
+# Initialization Parameters
+#--------------------------------------------------------------------------------------------
+INI.nTimeskip: 0
+INI.RecordOutputs: 0
+INI.EnableAlignment: 1
+INI.UseGroundTruthCalib: 1
+INI.nAngleThrd: 0.3
+INI.nLengthThrd: 0.01
+# RVIO2 normally waits until it detects motion after collecting stationary IMU
+# samples. uHumans2 office starts with nearly constant-velocity motion, so that
+# motion gate can take about 20s. Initialize after the stationary preroll.
+INI.nStaticInitTime: 3.0
+
+#--------------------------------------------------------------------------------------------
+# Tracker Parameters
+#--------------------------------------------------------------------------------------------
+Tracker.nFeatures: 200
+Tracker.nMinTrackingLength: 3
+Tracker.nMaxTrackingLength: 15
+Tracker.nQualLvl: 1e-2
+Tracker.nMinDist: 15
+Tracker.nMaxSlamPoints: 0
+Tracker.nGoodParallax: 5
+Tracker.nBlockSizeX: 150
+Tracker.nBlockSizeY: 120
+Tracker.EnableFilter: 0
+Tracker.EnableEqualizer: 1
+Tracker.nRansacIter: 16
+Tracker.UseSampson: 1
+Tracker.nSampsonErrThrd: 1e-6
+Tracker.nAlgebraicErrThrd: 1e-3
+
+#--------------------------------------------------------------------------------------------
+# Displayer Parameters
+#--------------------------------------------------------------------------------------------
+Displayer.ShowTrack: 1
+Displayer.ShowNewer: 0
+Displayer.nLandmarkScale: 0.03
+Displayer.nLandmarkPubRate: 5

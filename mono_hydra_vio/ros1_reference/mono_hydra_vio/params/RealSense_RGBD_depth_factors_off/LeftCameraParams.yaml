@@ -1,0 +1,32 @@
+%YAML:1.0
+
+################################################################################
+# Created by: Bavantha                                                           #
+# Created on: 2025-01-09T00:40:57.649808                                       #
+################################################################################
+
+# General sensor definitions
+camera_id: camera_color_optical_frame
+
+# Sensor extrinsics wrt. the body-frame
+T_BS:
+  cols: 4
+  rows: 4
+  data:  [0.99960486,  0.02753616,  0.00564652, -0.00516481,
+         -0.02761776,  0.99950718,  0.01492168,  0.01767537,
+         -0.00523285, -0.01507173,  0.99987272,  0.07581635,
+          0.00000000,  0.00000000,  0.00000000,  1.00000000]
+
+# Camera specific definitions
+rate_hz: 20
+resolution: [848, 480]  # [width, height]
+camera_model: pinhole
+intrinsics: [523.8679783632149, 527.3991129729038, 417.35786731997706, 250.39502964565867]  # [fu, fv, cu, cv]
+distortion_model: radtan
+distortion_coefficients: [0.06912150, -0.10320944,  0.00040500, -0.00063706]  # model dependent
+
+virtual_baseline: 0.3
+min_depth: 0.0
+depth_to_meters: 1.0
+max_depth: 10.0
+is_registered: 1

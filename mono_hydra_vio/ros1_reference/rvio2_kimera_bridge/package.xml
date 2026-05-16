@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>rvio2_kimera_bridge</name>
+  <version>0.0.1</version>
+  <description>Side-test bridge for driving mono_hydra_vio_ros with RVIO2 external odometry.</description>
+
+  <maintainer email="bavanthau@eng.pdn.ac.lk">Bavantha</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>cv_bridge</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf</depend>
+
+  <export/>
+</package>

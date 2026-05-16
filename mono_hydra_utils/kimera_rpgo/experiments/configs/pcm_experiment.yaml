@@ -1,0 +1,56 @@
+generate_plot: true
+save_separate: true
+output_dir: "/home/yunchang/logs/slam_handbook/pcm"
+datasets:
+    - name: "m3500"
+      no_outlier_g2o: "/home/yunchang/Downloads/slam_handbook/g2o/m3500/input_M3500_g2o.g2o"
+      outlier_g2o: "/home/yunchang/Downloads/slam_handbook/g2o/m3500/pcm/input_M3500_or00.g2o"
+      print: "M3500"
+      is_3d: False
+      outlier_threshold: 0.59 # this overrides the outlier threshold set in config 0.5 * sqrt(chi2 0.7)
+      corrupted_odom: [2000, 3000] # line 5501, 6501
+    - name: "victoria_park"
+      no_outlier_g2o: "/home/yunchang/Downloads/slam_handbook/g2o/victoria_park/victoriaPark-processed.g2o"
+      outlier_g2o: "/home/yunchang/Downloads/slam_handbook/g2o/victoria_park/pcm/victoriaPark-or00_2.g2o"
+      print: "Victoria Park"
+      is_3d: False
+      outlier_threshold: 2.8 # this overrides the outlier threshold set in config
+      corrupted_odom: [2138, 4736] # line 10490, 14509
+    - name: "subt_tunnel"
+      gt_g2o: "/home/yunchang/Downloads/slam_handbook/g2o/subt_tunnel/processed/subt_tunnel_husky4_gt_updated.g2o"
+      outlier_g2o: "/home/yunchang/Downloads/slam_handbook/g2o/subt_tunnel/pcm/subt_tunnel_husky4_2.g2o"
+      print: "SubT Tunnel"
+      is_3d: True
+      pcd_dir: "/home/yunchang/Downloads/slam_handbook/g2o/subt_tunnel/pcd"
+      outlier_threshold: 0.98 # this overrides the outlier threshold set in config
+      corrupted_odom: [199, 318] # line 881, 1000
+configs:
+    - name: "gnc"
+      robust_cost: "tls"
+      solver_type: "least_squares"
+      print: "GNC"
+      use_gnc: True
+      max_iterations: 1000
+      relative_error_tol: 1.0e-7
+      absolute_error_tol: 1.0e-7
+    - name: "pcm"
+      robust_cost: "none"
+      solver_type: "least_squares"
+      print: "PCM"
+      use_gnc: False
+      use_pcm: True
+      pcm_trans_threshold: 0.01
+      pcm_rot_threshold: 0.001
+      max_iterations: 1000
+      relative_error_tol: 1.0e-7
+      absolute_error_tol: 1.0e-7
+    - name: "pcm_gnc"
+      robust_cost: "tls"
+      solver_type: "least_squares"
+      print: "PCM + GNC"
+      use_gnc: True
+      use_pcm: True
+      max_iterations: 1000
+      relative_error_tol: 1.0e-7
+      absolute_error_tol: 1.0e-7
+

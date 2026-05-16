@@ -1,0 +1,54 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="config_dir" default="$(find mono_hydra)/config/drone"/>
+    <arg name="use_gt_frame" default="true" doc="use simulator-provided tf frame"/>
+    <arg name="use_gt_semantics" default="true" doc="use simulator-provider semantics"/>
+    <arg name="color_mesh_by_label" default="false" doc="display mesh colored by semantic label"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="use_2d_places" default="true"/>
+    <arg name="use_single_channel_label_image" default="false"/>
+
+
+    <arg name="robot_frame" default="$(eval 'base_link_gt' if arg('use_gt_frame') else 'base_link_kimera')" doc="robot body tf frame"/>
+    <arg name="odom_frame" default="$(eval 'world' if arg('use_gt_frame') else 'odom')" doc="odometry (map) frame"/>
+    <arg name="sensor_frame" default="$(eval 'left_cam' if arg('use_gt_frame') else 'left_cam_kimera')" doc="camera frame"/>
+
+    <!-- sensor range config -->
+    <arg name="sensor_min_range" default="0.1" doc="minimum sensor range in meters"/>
+    <arg name="sensor_max_range" default="10.0" doc="maximum sensor range in meters"/>
+
+    <!-- semantics -->
+    <arg name="labelspace_name" default="nyud20_config"/>
+    <arg name="semantic_map_dir" default="$(find m2h)/config/colors"/>
+    <arg name="semantic_map_file" default="$(arg labelspace_name).csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <arg name="semantic_label_remap_filepath" default="$(find m2h)/config/label_remaps/nyud40_remap.yaml" if="$(arg use_single_channel_label_image)"/>
+
+     <!-- labelspace configuration -->
+    <arg name="labelspace_dir" default="$(find m2h)/config/label_spaces"/>
+    <arg name="labelspace_path" default="$(arg labelspace_dir)/$(arg labelspace_name)_label_space.yaml"/>
+
+    <!-- logging output for hydra -->
+    <arg name="dataset_name" default="itc"/> 
+    <arg name="dsg_output_dir" default="$(find mono_hydra)/output/"/>
+    <arg name="dsg_output_prefix" default="$(arg dataset_name)"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+
+    <arg name="rgb_topic" default="/zed/zed_node/rgb/rect/image"/>
+    <arg name="rgb_info_topic" default="/zed/zed_node/rgb/rect/camera_info"/>
+    <arg name="depth_topic" default="/camera/depth_cam/image_raw"/>
+    <arg name="label_topic" default="/camera/seg_cam/image_raw"/>
+    <!-- <arg name="prerecorded_topic" default="/oneformer/labels/image_raw"/> -->
+
+
+    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_6" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom zed_camera_frame"/> -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_7" args="0.0 0.0 0.0 0.49999723 0.50339024 0.5023085 0.4942542 odom map"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_8" args="0.0 0.0 0.0 0.49999723 0.50339024 0.5023085 0.4942542 odom world"/>
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+        <arg name="rviz_file" value="d435i.rviz"/>
+    </include>
+
+</launch>

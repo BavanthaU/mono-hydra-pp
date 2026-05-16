@@ -1,0 +1,66 @@
+%YAML:1.0
+# Backend modality for regular VIO
+# 0: Structureless factors only, 4: SPR pipeline
+backend_modality: 0
+
+# INITIALIZATION PARAMETERS
+autoInitialize: 1
+initialization_from_imu_type: 1
+initialize_on_detected_acceleration: 1
+imu_accel_std_dev_when_stationary: 0.1
+roundOnAutoInitialize: 0
+initialPositionSigma: 1e-05
+initialRollPitchSigma: 0.174533
+initialYawSigma: 0.00174533
+initialVelocitySigma: 0.001
+initialAccBiasSigma: 0.1
+initialGyroBiasSigma: 0.01
+
+# VISION PARAMETERS ###########################################################
+linearizationMode: 0
+degeneracyMode: 1
+rankTolerance: 1
+landmarkDistanceThreshold: 10
+outlierRejection: 3
+retriangulationThreshold: 0.001
+
+# Noise models
+smartNoiseSigma: 3.0
+monoNoiseSigma: 1.8
+monoNormType: 2
+monoNormParam: 4.6851
+stereoNoiseSigma: 1.8
+stereoNormType: 2
+stereoNormParam: 4.6851
+regularityNoiseSigma: 0.03
+regularityNormType: 1
+regularityNormParam: 0.04
+
+# Between Stereo Factors
+addBetweenStereoFactors: 1
+betweenRotationPrecision: 0
+betweenTranslationPrecision: 100
+
+# OPTIMIZATION PARAMETERS #####################################################
+relinearizeThreshold: 0.01
+relinearizeSkip: 1
+zero_velocity_precision: 1000
+no_motion_position_precision: 1000
+no_motion_rotation_precision: 10000
+constant_vel_precision: 100
+numOptimize: 1
+nr_states: 30
+wildfire_threshold: 0.001
+useDogLeg: 0
+
+# PoseGuessSource: IMU=0, MONO=1, STEREO=2, PNP=3, EXTERNAL_ODOM=4
+pose_guess_source: 4
+mono_translation_scale_factor: 0.1
+
+# Sparse depth factor ablation switch.
+use_sparse_depth_factors: false
+sparse_depth_max_factors_per_kf: 30
+sparse_depth_sigma_a: 0.05
+sparse_depth_sigma_b: 0.02
+sparse_depth_huber_k: 1.5
+sparse_depth_reproj_thresh_px: 2.0

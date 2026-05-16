@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>mono_hydra_vio</name>
+  <version>0.1.0</version>
+  <description>R-VIO2, Kimera pose-graph interfaces, and VIO adapters for Mono Hydra.</description>
+  <maintainer email="bavanthau@eng.pdn.ac.lk">Bavantha Udugama</maintainer>
+  <license>MIT AND GPL-3.0-or-later</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <depend>ament_index_cpp</depend>
+  <depend>cv_bridge</depend>
+  <depend>dbow2</depend>
+  <depend>gtsam</depend>
+  <depend>geometry_msgs</depend>
+  <depend>kimera_rpgo_legacy</depend>
+  <depend>libgflags-dev</depend>
+  <depend>libgoogle-glog-dev</depend>
+  <depend>message_filters</depend>
+  <depend>nav_msgs</depend>
+  <depend>opengv</depend>
+  <depend>pose_graph_tools_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

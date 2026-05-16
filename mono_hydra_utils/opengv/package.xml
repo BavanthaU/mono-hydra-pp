@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>opengv</name>
+  <version>1.0.0</version>
+  <description>OpenGV geometric vision library vendored for Mono Hydra VIO.</description>
+
+  <maintainer email="bavanthau@eng.pdn.ac.lk">Bavantha Udugama</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  <depend>libeigen3-dev</depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

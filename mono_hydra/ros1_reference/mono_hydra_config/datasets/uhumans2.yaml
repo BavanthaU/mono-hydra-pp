@@ -1,0 +1,18 @@
+---
+type: RosInput
+tf_verbosity: 1
+tf_wait_duration_s: $(arg tf_wait_duration_s)
+tf_max_tries: $(arg tf_max_tries)
+tf_buffer_size_s: $(arg tf_buffer_size_s)
+clear_queue_on_fail: true
+receivers:
+  - type: ImageReceiver
+    queue_size: 50
+    sensor:
+      type: camera_info
+      min_range: $(arg sensor_min_range)
+      max_range: $(arg sensor_max_range)
+      camera_info_topic: $(arg rgb_info_topic)
+      extrinsics:
+        type: ros
+        sensor_frame: $(arg sensor_frame)

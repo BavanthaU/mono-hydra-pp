@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>pose_graph_tools</name>
+  <version>1.0.0</version>
+  <description>Type definitions for working with pose graphs.</description>
+
+  <maintainer email="yunchang@mit.edu">Yun Chang</maintainer>
+  <maintainer email="lschmid@mit.edu">Lukas Schmid</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  <depend>eigen</depend>
+
+   <export>
+     <build_type>cmake</build_type>
+   </export>
+</package>

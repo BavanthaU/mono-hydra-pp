@@ -1,0 +1,92 @@
+%YAML:1.0
+
+# RVIO2 side-test config for the ITC RealSense stream.
+# This stays separate from the stock rvio2 package so the default flow is untouched.
+
+#--------------------------------------------------------------------------------------------
+# IMU Parameters
+#--------------------------------------------------------------------------------------------
+IMU.dps: 200
+IMU.sigma_g: 1.6968e-04
+IMU.sigma_wg: 1.9393e-05
+IMU.sigma_a: 2.0000e-3
+IMU.sigma_wa: 3.0000e-3
+IMU.nG: 9.8082
+IMU.nSmallAngle: 0.001745329
+
+#--------------------------------------------------------------------------------------------
+# Camera Parameters
+#--------------------------------------------------------------------------------------------
+Camera.fps: 20
+Camera.width: 848
+Camera.height: 480
+Camera.RGB: 1
+Camera.Fisheye: 0
+Camera.fx: 612.5659179
+Camera.fy: 611.7391967
+Camera.cx: 417.6900329
+Camera.cy: 243.9552154
+Camera.k1: 0
+Camera.k2: 0
+Camera.p1: 0
+Camera.p2: 0
+Camera.sigma_px: 0.001632477
+Camera.sigma_py: 0.001634684
+
+Camera.T_BC0_GT: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [ 0.999931, 0.01139, -0.00300426, -0.0148924347013235,
+           -0.0114012, 0.999928, -0.00371329, 0.00011271434777882,
+            0.00296175, 0.00374728, 0.999989, -0.000207928664167412,
+            0.0, 0.0, 0.0, 1.0]
+
+Camera.T_BC0: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [0.0, -1.0, 0.0, 0.0,
+           1.0,  0.0, 0.0, 0.0,
+           0.0,  0.0, 1.0, 0.0,
+           0.0,  0.0, 0.0, 1.0]
+
+Camera.nTimeOffset_GT: 0
+Camera.nTimeOffset: 0
+
+#--------------------------------------------------------------------------------------------
+# Initialization Parameters
+#--------------------------------------------------------------------------------------------
+INI.nTimeskip: 0
+INI.RecordOutputs: 0
+INI.EnableAlignment: 1
+INI.UseGroundTruthCalib: 1
+INI.nAngleThrd: 0.3
+INI.nLengthThrd: 0.01
+
+#--------------------------------------------------------------------------------------------
+# Tracker Parameters
+#--------------------------------------------------------------------------------------------
+Tracker.nFeatures: 200
+Tracker.nMinTrackingLength: 3
+Tracker.nMaxTrackingLength: 15
+Tracker.nQualLvl: 1e-2
+Tracker.nMinDist: 15
+Tracker.nMaxSlamPoints: 0
+Tracker.nGoodParallax: 5
+Tracker.nBlockSizeX: 150
+Tracker.nBlockSizeY: 120
+Tracker.EnableFilter: 0
+Tracker.EnableEqualizer: 1
+Tracker.nRansacIter: 16
+Tracker.UseSampson: 1
+Tracker.nSampsonErrThrd: 1e-6
+Tracker.nAlgebraicErrThrd: 1e-3
+
+#--------------------------------------------------------------------------------------------
+# Displayer Parameters
+#--------------------------------------------------------------------------------------------
+Displayer.ShowTrack: 1
+Displayer.ShowNewer: 0
+Displayer.nLandmarkScale: 0.03
+Displayer.nLandmarkPubRate: 5

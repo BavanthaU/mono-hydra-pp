@@ -1,0 +1,113 @@
+cmake_minimum_required(VERSION 3.5)
+project(kimera_pgmo VERSION 0.0.1)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_compile_options(-Wall -Wextra -Wno-sign-compare -Wno-unused-parameter)
+
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
+find_package(config_utilities REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(GTSAM REQUIRED)
+find_package(kimera_rpgo REQUIRED)
+find_package(pose_graph_tools REQUIRED)
+find_package(spatial_hash REQUIRED)
+
+set(CLEAR_WARNING_SUPPRESSION OFF)
+if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+  set(CLEAR_WARNING_SUPPRESSION ON)
+  set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
+endif()
+
+find_package(PCL REQUIRED COMPONENTS common geometry kdtree octree)
+
+if(CLEAR_WARNING_SUPPRESSION)
+  unset(CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+add_library(
+  ${PROJECT_NAME}
+  src/compression/block_compression.cpp
+  src/compression/delta_compression.cpp
+  src/compression/mesh_compression.cpp
+  src/compression/octree_compression.cpp
+  src/compression/redundancy_checker.cpp
+  src/utils/common_structs.cpp
+  src/utils/graph.cpp
+  src/utils/logging.cpp
+  src/utils/mesh_io.cpp
+  src/utils/pcl_utilities.cpp
+  src/utils/range_generator.cpp
+  src/optimizer/kimera_rpgo_optimizer.cpp
+  src/deformation_graph.cpp
+  src/deformation_graph_io.cpp
+  src/kimera_pgmo_interface.cpp
+  src/mesh_deformation.cpp
+  src/mesh_delta.cpp
+  src/mesh_frontend_interface.cpp
+  src/mesh_offset_info.cpp
+  src/mesh_traits.cpp
+  src/mesh_types.cpp
+  src/pcl_mesh_traits.cpp
+  src/sparse_keyframe.cpp)
+target_include_directories(
+  ${PROJECT_NAME}
+  PUBLIC $<INSTALL_INTERFACE:include>
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+         ${PCL_INCLUDE_DIRS})
+target_link_libraries(
+  ${PROJECT_NAME}
+  PUBLIC ${PCL_LIBRARIES}
+         Eigen3::Eigen
+         kimera_rpgo::kimera_rpgo
+         gtsam
+         pose_graph_tools::pose_graph_tools
+         spatial_hash::spatial_hash
+         config_utilities::config_utilities)
+set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_library(kimera_pgmo::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
+add_executable(offline_deformation app/offline_deformation.cpp)
+target_link_libraries(offline_deformation ${PROJECT_NAME})
+
+add_executable(mesh_trajectory_deformer app/mesh_trajectory_deformer.cpp)
+target_link_libraries(mesh_trajectory_deformer ${PROJECT_NAME})
+
+include(CTest)
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(test)
+endif()
+
+install(
+  TARGETS ${PROJECT_NAME} mesh_trajectory_deformer
+  EXPORT kimera_pgmo-targets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(
+  EXPORT kimera_pgmo-targets
+  FILE kimera_pgmoTargets.cmake
+  NAMESPACE kimera_pgmo::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kimera_pgmo)
+
+configure_package_config_file(
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/kimera_pgmoConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/kimera_pgmoConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kimera_pgmo)
+write_basic_package_version_file(
+  kimera_pgmoConfigVersion.cmake
+  VERSION ${PACKAGE_VERSION}
+  COMPATIBILITY AnyNewerVersion)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/kimera_pgmoConfig.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/kimera_pgmoConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kimera_pgmo)

@@ -1,0 +1,24 @@
+%YAML:1.0
+imu_preintegration_type: 1
+T_BS:
+  cols: 4
+  rows: 4
+  data: [1.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
+rate_hz: 100.0
+
+# Synthetic IMU derived from poses: heavily downweight to favor external odom + vision.
+imu_bias_init_sigma: 0.1
+gyroscope_noise_density: 1.0         # rad/s/sqrt(Hz)
+gyroscope_random_walk: 0.05          # rad/s^2/sqrt(Hz)
+accelerometer_noise_density: 5.0     # m/s^2/sqrt(Hz)
+accelerometer_random_walk: 0.1       # m/s^3/sqrt(Hz)
+
+do_imu_rate_time_alignment: 0
+time_alignment_window_size_s: 10.0
+time_alignment_variance_threshold_scaling: 30.0
+imu_integration_sigma: 1.0e-8
+imu_time_shift: 0.0
+n_gravity: [0.0, 0.0, 0]

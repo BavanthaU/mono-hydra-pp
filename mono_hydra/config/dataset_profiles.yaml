@@ -1,0 +1,43 @@
+profiles:
+  scannet:
+    perception_dataset: scannet
+    labelspace_name: scannet20_config
+    odom_frame: scannet_world
+    camera_frame: scannet_camera
+    imu_topic: /imu/aligned
+    rgb_topic: /camera/color/image_raw
+    camera_info_topic: /camera/color/camera_info
+    depth_topic: /camera/depth_cam/image_raw
+    label_topic: /camera/seg_cam/labels_argmax
+  itc:
+    perception_dataset: itc
+    labelspace_name: nyud20_config
+    rvio2_config: itc_realsense_848x480.yaml
+    odom_frame: odom
+    camera_frame: left_cam_kimera
+    imu_topic: /camera/imu
+    rgb_topic: /camera/color/image_raw
+    camera_info_topic: /camera/color/camera_info
+    depth_topic: /camera/depth_cam/image_raw
+    label_topic: /camera/seg_cam/labels_argmax
+  7scenes:
+    perception_dataset: scannet
+    labelspace_name: scannet20_config
+    odom_frame: scannet_world
+    camera_frame: scannet_camera
+    imu_topic: /imu/aligned
+    rgb_topic: /camera/color/image_raw
+    camera_info_topic: /camera/color/camera_info
+    depth_topic: /camera/depth_cam/image_raw
+    label_topic: /camera/seg_cam/labels_argmax
+  uhumans2:
+    perception_dataset: nyud
+    labelspace_name: nyud20_config
+    rvio2_config: uhumans2_office_720x480.yaml
+    odom_frame: world
+    camera_frame: left_cam_kimera
+    imu_topic: /tesse/imu/clean/imu
+    rgb_topic: /tesse/left_cam/rgb/image_raw
+    camera_info_topic: /tesse/left_cam/camera_info
+    depth_topic: /tesse/m2h/depth/image_raw
+    label_topic: /tesse/m2h/labels_argmax

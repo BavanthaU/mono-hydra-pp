@@ -1,0 +1,193 @@
+<launch>
+  <!--
+    uHumans2 ablation stack.
+
+    profile:=gt_reference
+      Starts Hydra only. Inputs are bag GT TF, bag GT depth, and converter-made
+      GT label IDs remapped into the NYUD20 comparison space.
+
+    profile:=learned
+      Starts Hydra + Kimera VIO. It expects the external M2H node to publish
+      depth and NYUD20 labels from its own conda environment. Bag TF must be
+      remapped away during replay.
+
+    mask_source:
+      none = no VIO semantic feature mask
+      m2h  = learned mask from M2H NYUD20 labels; masks dynamic-nonhuman/human
+             labels 19 and 20 from the NYUDv2 checkpoint
+      gt   = oracle mask from converter-made uHumans2 GT labels
+  -->
+
+  <arg name="profile" default="learned" doc="gt_reference or learned"/>
+  <arg name="scene" default="office" doc="office or apartment"/>
+  <arg name="human_count" default="06" doc="office: 06 or 12; apartment: 01 or 02"/>
+  <arg name="run_tag" default="nyud_mask_off_sparse_off"/>
+  <arg name="mask_source" default="none" doc="none, m2h, or gt"/>
+  <arg name="use_sparse_depth_factors" default="false"/>
+  <arg name="sequence_base"
+       default="$(eval 'uHumans2_' + arg('scene') + '_s1_%02dh' % int(arg('human_count')))"/>
+  <arg name="bag_path" default="$(find mono_hydra)/../../data/uHumans/$(arg sequence_base).bag"/>
+  <arg name="sequence_name"
+       default="$(eval arg('sequence_base') + '_' + arg('run_tag'))"/>
+
+  <arg name="start_hydra" default="true"/>
+  <arg name="start_vio" default="true"/>
+  <arg name="start_gt_label_converter" default="true"/>
+  <arg name="start_visualizer" default="true"/>
+  <arg name="rviz_dir" default="$(find mono_hydra)/rviz"/>
+  <arg name="rviz_file" default="uHumans_m2h.rviz"/>
+  <arg name="sensor_min_range" default="0.1"/>
+  <arg name="sensor_max_range" default="6.0"/>
+  <arg name="vio_use_rviz" default="true"/>
+  <arg name="vio_visualize" default="true"/>
+  <arg name="use_external_odom" default="false"/>
+  <arg name="external_odom_topic" default="/external_odometry"/>
+  <arg name="hydra_use_pose_graph_from_odom" default="false"
+       doc="Fallback only: build Hydra agent nodes from odom TF instead of Kimera's pose_graph_incremental. Keep false for Kimera LCD proposals consumed by Hydra."/>
+
+  <arg name="gt_rgb_semantic_topic" default="/tesse/seg_cam/rgb/image_raw"/>
+  <arg name="gt_label_topic" default="/tesse/seg_cam/labels_argmax"/>
+  <arg name="m2h_depth_topic" default="/tesse/m2h/depth/image_raw"/>
+  <arg name="m2h_label_topic" default="/m2h_hmx_large/labels_argmax"/>
+  <arg name="semantic_mask_inflate_px" default="8"/>
+
+  <arg name="dsg_output_dir" default="$(find mono_hydra)/output/uhumans2"/>
+  <arg name="gt_dsg_output_dir" default="$(find hydra)/output/uhumans2"/>
+  <arg name="vio_output_dataset_name" default="uHumans2_RGBD"/>
+
+  <arg name="comparison_labelspace_name" default="nyud20_config"/>
+  <arg name="comparison_labelspace_dir" default="$(find m2h_hmx_large)/config/label_spaces"/>
+  <arg name="comparison_semantic_map_dir" default="$(find m2h_hmx_large)/config/colors"/>
+  <arg name="uhumans2_to_comparison_remap"
+       default="$(find hydra)/config/label_remaps/uhumans2_$(arg scene)_nyud20_remap.yaml"/>
+  <arg name="gt_semantic_colormap"
+       default="$(find hydra_ros)/config/color/uhumans2_$(arg scene).csv"/>
+  <arg name="gt_semantic_labelspace_file"
+       default="$(find hydra)/config/label_spaces/uhumans2_$(arg scene)_label_space.yaml"/>
+
+  <arg if="$(eval arg('use_sparse_depth_factors') and not arg('use_external_odom'))"
+       name="vio_params_dataset_name"
+       value="uHumans2_RGBD_depth_factors_on"/>
+  <arg if="$(eval (not arg('use_sparse_depth_factors')) and not arg('use_external_odom'))"
+       name="vio_params_dataset_name"
+       value="uHumans2_RGBD_depth_factors_off"/>
+  <arg if="$(eval arg('use_sparse_depth_factors') and arg('use_external_odom'))"
+       name="vio_params_dataset_name"
+       value="uHumans2_RGBD_RVIO2_depth_factors_on"/>
+  <arg if="$(eval (not arg('use_sparse_depth_factors')) and arg('use_external_odom'))"
+       name="vio_params_dataset_name"
+       value="uHumans2_RGBD_RVIO2_depth_factors_off"/>
+
+  <arg if="$(eval arg('mask_source') == 'none')"
+       name="semantic_mask_topic"
+       value=""/>
+  <arg if="$(eval arg('mask_source') == 'm2h')"
+       name="semantic_mask_topic"
+       value="$(arg m2h_label_topic)"/>
+  <arg if="$(eval arg('mask_source') == 'gt')"
+       name="semantic_mask_topic"
+       value="$(arg gt_label_topic)"/>
+
+  <arg if="$(eval arg('mask_source') == 'm2h')"
+       name="semantic_mask_labelspace_file"
+       value="$(find m2h_hmx_large)/config/label_spaces/nyud20_config_label_space.yaml"/>
+  <arg unless="$(eval arg('mask_source') == 'm2h')"
+       name="semantic_mask_labelspace_file"
+       value="$(arg gt_semantic_labelspace_file)"/>
+
+  <param name="use_sim_time" value="true"/>
+  <param name="/uhumans2_ablation/scene" type="str" value="$(arg scene)"/>
+  <param name="/uhumans2_ablation/human_count" type="str" value="$(arg human_count)"/>
+  <param name="/uhumans2_ablation/sequence_base" type="str" value="$(arg sequence_base)"/>
+  <param name="/uhumans2_ablation/bag_path" type="str" value="$(arg bag_path)"/>
+  <param name="/uhumans2_ablation/run_tag" type="str" value="$(arg run_tag)"/>
+  <param name="/uhumans2_ablation/sequence_name" type="str" value="$(arg sequence_name)"/>
+
+  <node pkg="hydra_ros"
+        type="semantic_rgb_to_labels.py"
+        name="uhumans2_semantic_rgb_to_labels"
+        output="screen"
+        if="$(eval arg('start_gt_label_converter') and (arg('profile') == 'gt_reference' or arg('mask_source') == 'gt'))">
+    <param name="input" value="$(arg gt_rgb_semantic_topic)"/>
+    <param name="output" value="$(arg gt_label_topic)"/>
+    <param name="colormap_csv" value="$(arg gt_semantic_colormap)"/>
+    <param name="unknown_label" value="0"/>
+  </node>
+
+  <!-- GT reference: Hydra only, using bag TF/depth/semantics. -->
+  <group if="$(eval arg('start_hydra') and arg('profile') == 'gt_reference')">
+    <include file="$(find hydra_ros)/launch/static_tfs/uhumans2_static_tfs.xml"/>
+    <node pkg="tf2_ros"
+          type="static_transform_publisher"
+          name="fake_world_tf"
+          args="0 0 0 0 0 0 1 map world"/>
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+      <arg name="robot_frame" value="base_link_gt"/>
+      <arg name="odom_frame" value="world"/>
+      <arg name="sensor_frame" value="left_cam"/>
+      <arg name="config_dir" value="$(find hydra)/config/uhumans2"/>
+      <arg name="dataset_name" value="uhumans2"/>
+      <arg name="input_config_path" value="$(find hydra_ros)/config/datasets/uhumans2.yaml"/>
+      <arg name="labelspace_name" value="$(arg comparison_labelspace_name)"/>
+      <arg name="labelspace_dir" value="$(arg comparison_labelspace_dir)"/>
+      <arg name="semantic_map_path" value="$(arg comparison_semantic_map_dir)/$(arg comparison_labelspace_name).csv"/>
+      <arg name="semantic_label_remap_filepath" value="$(arg uhumans2_to_comparison_remap)"/>
+      <arg name="rgb_topic" value="/tesse/left_cam/rgb/image_raw"/>
+      <arg name="rgb_info_topic" value="/tesse/left_cam/camera_info"/>
+      <arg name="depth_topic" value="/tesse/depth_cam/mono/image_raw"/>
+      <arg name="label_topic" value="$(arg gt_label_topic)"/>
+      <arg name="sensor_min_range" value="$(arg sensor_min_range)"/>
+      <arg name="sensor_max_range" value="$(arg sensor_max_range)"/>
+      <arg name="use_gt_frame" value="true"/>
+      <arg name="use_2d_places" value="true"/>
+      <arg name="start_visualizer" value="$(arg start_visualizer)"/>
+      <arg name="rviz_dir" value="$(arg rviz_dir)"/>
+      <arg name="rviz_file" value="$(arg rviz_file)"/>
+      <arg name="dsg_output_dir" value="$(arg gt_dsg_output_dir)"/>
+      <arg name="dsg_output_prefix" value="$(arg sequence_name)"/>
+    </include>
+  </group>
+
+  <!-- Learned stack: external M2H depth/semantics + Kimera VIO pose, no bag TF. -->
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros_uhumans2_office_rgbd.launch"
+           if="$(eval arg('start_vio') and arg('profile') != 'gt_reference')">
+    <arg name="params_dataset_name" value="$(arg vio_params_dataset_name)"/>
+    <arg name="output_dataset_name" value="$(arg vio_output_dataset_name)"/>
+    <arg name="sequence_name" value="$(arg sequence_name)"/>
+    <arg name="online" value="true"/>
+    <arg name="viz_type" value="1"/>
+    <arg name="use_rviz" value="$(arg vio_use_rviz)"/>
+    <arg name="visualize" value="$(arg vio_visualize)"/>
+    <arg name="use_lcd" value="true"/>
+    <arg name="lcd_no_optimize" value="true"/>
+    <arg name="depth_cam_topic" value="$(arg m2h_depth_topic)"/>
+    <arg name="use_external_odom" value="$(arg use_external_odom)"/>
+    <arg name="external_odom_topic" value="$(arg external_odom_topic)"/>
+    <arg name="publish_tf" value="$(eval not arg('use_external_odom'))"/>
+    <arg name="semantic_mask_topic" value="$(arg semantic_mask_topic)"/>
+    <arg name="semantic_mask_inflate_px" value="$(arg semantic_mask_inflate_px)"/>
+    <arg name="semantic_labelspace_file" value="$(arg semantic_mask_labelspace_file)"/>
+  </include>
+
+  <include file="$(find mono_hydra)/launch/hydra_v2_uhumans2_rgbd.launch"
+           if="$(eval arg('start_hydra') and arg('profile') != 'gt_reference')">
+    <arg name="use_gt_frame" value="false"/>
+    <arg name="use_gt_depth" value="false"/>
+    <arg name="use_gt_semantics" value="false"/>
+    <arg name="labelspace_name" value="$(arg comparison_labelspace_name)"/>
+    <arg name="labelspace_dir" value="$(arg comparison_labelspace_dir)"/>
+    <arg name="semantic_map_dir" value="$(arg comparison_semantic_map_dir)"/>
+    <arg name="depth_topic" value="$(arg m2h_depth_topic)"/>
+    <arg name="label_topic" value="$(arg m2h_label_topic)"/>
+    <arg name="sensor_min_range" value="$(arg sensor_min_range)"/>
+    <arg name="sensor_max_range" value="$(arg sensor_max_range)"/>
+    <arg name="sequence_name" value="$(arg sequence_name)"/>
+    <arg name="dsg_output_dir" value="$(arg dsg_output_dir)"/>
+    <arg name="dsg_output_prefix" value="$(arg sequence_name)"/>
+    <arg name="start_visualizer" value="$(arg start_visualizer)"/>
+    <arg name="rviz_dir" value="$(arg rviz_dir)"/>
+    <arg name="rviz_file" value="$(arg rviz_file)"/>
+    <arg name="use_pose_graph_from_odom" value="$(arg hydra_use_pose_graph_from_odom)"/>
+  </include>
+</launch>

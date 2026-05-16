@@ -1,0 +1,66 @@
+<launch>
+  <arg name="params_dataset_name" default="uHumans2_RGBD"/>
+  <arg name="dataset_name" value="$(arg params_dataset_name)"/>
+  <arg name="output_dataset_name" default="uHumans2_RGBD"/>
+  <arg name="sequence_name" default="uHumans2_office_s1_00h"/>
+
+  <arg name="online" default="true" />
+  <arg name="log_output" default="true"/>
+  <arg name="verbosity" default="0"/>
+  <arg name="debug" default="false"/>
+  <arg name="should_use_sim_time" default="true"/>
+
+  <arg name="use_lcd" default="true"/>
+  <arg name="lcd_no_optimize" default="false"/>
+  <arg name="lcd_no_detection" default="false"/>
+  <arg name="viz_type" default="1"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="visualize" default="true"/>
+  <arg name="publish_tf" default="true"/>
+  <arg name="semantic_labelspace_file"
+       default="$(find hydra)/config/label_spaces/uhumans2_office_label_space.yaml"/>
+
+  <arg name="left_cam_topic" default="/tesse/left_cam/mono/image_raw"/>
+  <arg name="depth_cam_topic" default="/tesse/depth_cam/mono/image_raw"/>
+  <arg name="semantic_mask_topic" default=""/>
+  <arg name="semantic_mask_is_label_image" default="true"/>
+  <arg name="semantic_mask_inflate_px" default="8"/>
+  <arg name="imu_topic" default="/tesse/imu/clean/imu"/>
+  <arg name="use_external_odom" default="false"/>
+  <arg name="external_odom_topic" default="/tesse/odom"/>
+
+  <arg name="odom_frame_id" default="world"/>
+  <arg name="base_link_frame_id" default="base_link_kimera"/>
+  <arg name="map_frame_id" default="map"/>
+  <arg name="left_cam_frame_id" default="left_cam_kimera"/>
+  <arg name="right_cam_frame_id" default="right_cam_kimera"/>
+
+  <arg name="log_path" value="$(find mono_hydra_vio_ros)/output_logs/$(arg output_dataset_name)/$(arg sequence_name)"/>
+
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros.launch" pass_all_args="true">
+      <arg name="include_pipeline_flags" value="true"/>
+      <arg name="should_use_sim_time" value="$(arg should_use_sim_time)"/>
+      <arg name="viz_type" value="$(arg viz_type)"/>
+      <arg name="use_rviz" value="$(arg use_rviz)"/>
+      <arg name="visualize" value="$(arg visualize)"/>
+      <arg name="publish_tf" value="$(arg publish_tf)"/>
+      <arg name="log_gt_data" value="false"/>
+      <arg name="lcd_no_optimize" value="$(arg lcd_no_optimize)"/>
+      <arg name="lcd_no_detection" value="$(arg lcd_no_detection)"/>
+      <arg if="$(arg log_output)" name="log_output_path" value="$(arg log_path)"/>
+      <arg name="left_cam_topic" value="$(arg left_cam_topic)"/>
+      <arg name="depth_cam_topic" value="$(arg depth_cam_topic)"/>
+      <arg name="semantic_mask_topic" value="$(arg semantic_mask_topic)"/>
+      <arg name="semantic_mask_is_label_image" value="$(arg semantic_mask_is_label_image)"/>
+      <arg name="semantic_mask_inflate_px" value="$(arg semantic_mask_inflate_px)"/>
+      <arg name="imu_topic" value="$(arg imu_topic)"/>
+      <arg name="use_external_odom" value="$(arg use_external_odom)"/>
+      <arg name="external_odom_topic" value="$(arg external_odom_topic)"/>
+      <arg name="semantic_labelspace_file" value="$(arg semantic_labelspace_file)"/>
+      <arg name="odom_frame_id" value="$(arg odom_frame_id)"/>
+      <arg name="base_link_frame_id" value="$(arg base_link_frame_id)"/>
+      <arg name="map_frame_id" value="$(arg map_frame_id)"/>
+      <arg name="left_cam_frame_id" value="$(arg left_cam_frame_id)"/>
+      <arg name="right_cam_frame_id" value="$(arg right_cam_frame_id)"/>
+  </include>
+</launch>

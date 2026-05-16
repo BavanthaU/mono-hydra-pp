@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>config_utilities</name>
+  <version>2.0.0</version>
+  <description>Tools for working with C++ config structs.</description>
+
+  <author email="lschmid@mit.edu">Lukas Schmid</author>
+  <author email="na26933@mit.edu">Nathan Hughes</author>
+
+  <maintainer email="lschmid@mit.edu">Lukas Schmid</maintainer>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  <depend>yaml-cpp</depend>
+  <depend>libboost-filesystem-dev</depend>
+  <depend>libboost-system-dev</depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

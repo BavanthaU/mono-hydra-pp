@@ -1,0 +1,347 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 0
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Scene Graph1
+        - /Scene Graph1/Mesh1
+        - /Input1
+        - /Input1/RGB1
+        - /Input1/Depth1
+        - /Input1/Semantics1
+      Splitter Ratio: 0.5
+    Tree Height: 898
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Tool Properties
+    Expanded:
+      - /2D Pose Estimate1
+      - /2D Nav Goal1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.5886790156364441
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz/Time
+    Name: Time
+    SyncMode: 0
+    SyncSource: RGB
+Preferences:
+  PromptSaveOnExit: true
+Toolbars:
+  toolButtonStyle: 2
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz/TF
+      Enabled: false
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Alpha: 1
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /hydra_dsg_visualizer/dsg_markers
+          Name: Scene Graph (Static)
+          Namespaces:
+            interlayer_edges_3_2: true
+            interlayer_edges_4_3: true
+            interlayer_edges_5_4: true
+            layer_bounding_boxes_2: true
+            layer_bounding_boxes_edges_2: true
+            layer_edges_20: true
+            layer_edges_3: true
+            layer_labels_2: true
+            layer_labels_4: true
+            layer_labels_5: true
+            layer_nodes_2: true
+            layer_nodes_20: true
+            layer_nodes_3: true
+            layer_nodes_4: true
+            layer_nodes_5: true
+            layer_polygon_boundaries_20: true
+          Queue Size: 100
+          Value: true
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_dsg_visualizer/dynamic_layers_viz
+          Name: Scene Graph (Dynamic)
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+        - Class: kimera_pgmo_rviz/MeshDisplay
+          Cull Backfaces: true
+          Enable Lighting: false
+          Enabled: true
+          Name: Mesh
+          Queue Size: 10
+          Toggle Visibility All: true
+          Topic: /hydra_dsg_visualizer/dsg_mesh
+          Unreliable: false
+          Value: true
+          Visible:
+            Value: true
+            robot0:
+              Value: true
+              dsg_mesh: true
+      Enabled: true
+      Name: Scene Graph
+    - Class: rviz/Group
+      Displays:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: RGB8
+          Decay Time: 0
+          Enabled: true
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: Input Pointcloud
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.009999999776482582
+          Style: Flat Squares
+          Topic: /semantic_pointcloud
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: true
+        - Class: rviz/Image
+          Enabled: true
+          Image Topic: /camera/color/image_raw
+          Max Value: 1
+          Median window: 5
+          Min Value: 0
+          Name: RGB
+          Normalize Range: true
+          Queue Size: 2
+          Transport Hint: raw
+          Unreliable: false
+          Value: true
+        - Class: rviz/Image
+          Enabled: true
+          Image Topic: /camera/depth_cam/image_raw
+          Max Value: 1
+          Median window: 300
+          Min Value: 0
+          Name: Depth
+          Normalize Range: true
+          Queue Size: 2
+          Transport Hint: raw
+          Unreliable: false
+          Value: true
+        - Class: rviz/Image
+          Enabled: true
+          Image Topic: /camera/seg_cam/image_raw
+          Max Value: 1
+          Median window: 5
+          Min Value: 0
+          Name: Semantics
+          Normalize Range: true
+          Queue Size: 2
+          Transport Hint: raw
+          Unreliable: false
+          Value: true
+      Enabled: true
+      Name: Input
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /incremental_dsg_builder_node/pgmo/deformation_graph_mesh_mesh
+          Name: Mesh Edges
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: true
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /incremental_dsg_builder_node/pgmo/deformation_graph_pose_mesh
+          Name: Pose-Mesh Edges
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: true
+      Enabled: false
+      Name: Factor Graph
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_ros_node/places/gvd_graph_viz
+          Name: GVD Graph
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_ros_node/places/graph_viz
+          Name: Sparse GVD Graph
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_ros_node/places/gvd_cluster_viz
+          Name: GVD Clusters
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_ros_node/places/esdf_viz
+          Name: EsdfSlice
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+      Enabled: true
+      Name: Places
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_ros_node/reconstruction/tsdf_viz
+          Name: TSDF Distances
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+        - Class: rviz/MarkerArray
+          Enabled: false
+          Marker Topic: /hydra_ros_node/reconstruction/tsdf_weight_viz
+          Name: TSDF Weights
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: false
+      Enabled: true
+      Name: Reconstruction
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: false
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Queue Size: 10
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /mono_hydra_vio_ros/optimized_trajectory
+      Unreliable: false
+      Value: false
+  Enabled: true
+  Global Options:
+    Background Color: 255; 255; 255
+    Default Light: true
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+      Theta std deviation: 0.2617993950843811
+      Topic: /initialpose
+      X std deviation: 0.5
+      Y std deviation: 0.5
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 20.80084228515625
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Field of View: 0.7853981852531433
+      Focal Point:
+        X: 2.3078067302703857
+        Y: -7.599557876586914
+        Z: 0.007943643257021904
+      Focal Shape Fixed Size: false
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.2297973781824112
+      Target Frame: <Fixed Frame>
+      Yaw: 1.3853704929351807
+    Saved: ~
+Window Geometry:
+  Depth:
+    collapsed: false
+  Displays:
+    collapsed: false
+  Height: 1043
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd000000040000000000000156000003bdfc0200000008fb0000001200530065006c0065006300740069006f006e000000003b0000018f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000005fb0000043800000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b000003bd000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c0000026100000001000001ac000003bdfc0200000006fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb00000006005200470042010000003b000001370000001600fffffffb0000001200530065006d0061006e007400690063007301000001780000013c0000001600fffffffb0000000a0044006500700074006801000002ba0000013e0000001600fffffffb0000000a00560069006500770073000000007b0000037b000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d00650200000368000002580000035e000001e0fb0000000800540069006d0065010000000000000450000000000000000000000472000003bd00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  RGB:
+    collapsed: false
+  Selection:
+    collapsed: false
+  Semantics:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1920
+  X: 0
+  Y: 360

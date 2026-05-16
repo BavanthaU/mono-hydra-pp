@@ -1,0 +1,44 @@
+<launch>
+  <arg name="scene" default="office" doc="office or apartment"/>
+  <arg name="human_count" default="06" doc="office: 06 or 12; apartment: 01 or 02"/>
+  <arg name="sequence_base"
+       default="$(eval 'uHumans2_' + arg('scene') + '_s1_%02dh' % int(arg('human_count')))"/>
+  <arg name="bag_path" default="$(find mono_hydra)/../../data/uHumans/$(arg sequence_base).bag"/>
+  <arg name="pause" default="true"/>
+  <arg name="remap_tf" default="true"/>
+  <arg name="stationary_preroll" default="false"
+       doc="publish a synthetic static mono+IMU prefix before rosbag play, useful for RVIO2 init"/>
+  <arg name="stationary_preroll_duration" default="5.0"/>
+  <arg name="stationary_preroll_image_topic" default="/tesse/left_cam/mono/image_raw"/>
+  <arg name="stationary_preroll_imu_topic" default="/tesse/imu/clean/imu"/>
+  <arg name="stationary_preroll_extra_image_topics" default="/tesse/left_cam/rgb/image_raw"/>
+  <arg name="stationary_preroll_image_rate" default="20.0"/>
+  <arg name="stationary_preroll_imu_rate" default="200.0"/>
+  <arg name="use_context" default="false"
+       doc="if true, read scene/human_count/sequence_base from /uhumans2_ablation params"/>
+
+  <param unless="$(arg use_context)" name="/uhumans2_ablation/scene" type="str" value="$(arg scene)"/>
+  <param unless="$(arg use_context)" name="/uhumans2_ablation/human_count" type="str" value="$(arg human_count)"/>
+  <param unless="$(arg use_context)" name="/uhumans2_ablation/sequence_base" type="str" value="$(arg sequence_base)"/>
+  <param unless="$(arg use_context)" name="/uhumans2_ablation/bag_path" type="str" value="$(arg bag_path)"/>
+
+  <node pkg="mono_hydra"
+        type="uhumans2_bag_play.py"
+        name="uhumans2_bag_play"
+        output="screen">
+    <param name="use_context" value="$(arg use_context)"/>
+    <param name="scene" type="str" value="$(arg scene)"/>
+    <param name="human_count" type="str" value="$(arg human_count)"/>
+    <param name="sequence_base" type="str" value="$(arg sequence_base)"/>
+    <param name="bag_path" type="str" value="$(arg bag_path)"/>
+    <param name="pause" value="$(arg pause)"/>
+    <param name="remap_tf" value="$(arg remap_tf)"/>
+    <param name="stationary_preroll" value="$(arg stationary_preroll)"/>
+    <param name="stationary_preroll_duration" value="$(arg stationary_preroll_duration)"/>
+    <param name="stationary_preroll_image_topic" type="str" value="$(arg stationary_preroll_image_topic)"/>
+    <param name="stationary_preroll_imu_topic" type="str" value="$(arg stationary_preroll_imu_topic)"/>
+    <param name="stationary_preroll_extra_image_topics" type="str" value="$(arg stationary_preroll_extra_image_topics)"/>
+    <param name="stationary_preroll_image_rate" value="$(arg stationary_preroll_image_rate)"/>
+    <param name="stationary_preroll_imu_rate" value="$(arg stationary_preroll_imu_rate)"/>
+  </node>
+</launch>

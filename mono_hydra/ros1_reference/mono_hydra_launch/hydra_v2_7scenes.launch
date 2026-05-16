@@ -1,0 +1,94 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="config_dir" default="$(find mono_hydra)/config/drone"/>
+    <arg name="use_gt_frame" default="false" doc="use pose/TF from bag instead of VIO outputs"/>
+    <arg name="use_static_tfs" default="true" doc="publish static tfs to align odom/map/world"/>
+    <arg name="color_mesh_by_label" default="true" doc="display mesh colored by semantic label"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="use_2d_places" default="true"/>
+    <arg name="use_single_channel_label_image" default="true"/>
+
+    <!-- ZMQ overrides -->
+    <arg name="zmq_ip" default="127.0.0.1"/>
+    <arg name="zmq_send_url" default="tcp://$(arg zmq_ip):8003"/>
+    <arg name="zmq_recv_url" default="tcp://$(arg zmq_ip):8004"/>
+
+    <arg name="robot_frame" default="base_link_kimera" doc="robot body tf frame"/>
+    <arg name="odom_frame" default="map" doc="odometry (map) frame"/>
+    <arg name="sensor_frame" default="scannet_camera" doc="camera frame"/>
+    <arg name="scannet_world_frame" default="scannet_world" doc="7Scenes world frame id used in converted bags"/>
+    <arg name="scannet_world_parent" default="map" doc="parent frame for world frame"/>
+    <arg name="publish_scannet_world_tf" default="false" doc="publish static tf to world frame"/>
+    <arg name="scannet_world_roll" default="0.0" doc="roll (rad) to align world frame"/>
+    <arg name="scannet_world_pitch" default="0.0" doc="pitch (rad) to align world frame"/>
+    <arg name="scannet_world_yaw" default="0.0" doc="yaw (rad) to align world frame"/>
+    <arg name="external_odom_topic" default="/external_odometry" doc="optional external odom (map->base_link)"/>
+    <arg name="use_external_odom_tf" default="true" doc="broadcast TF from external odom to feed Hydra without VIO"/>
+
+    <!-- sensor range config -->
+    <arg name="sensor_min_range" default="0.05" doc="minimum sensor range in meters"/>
+    <arg name="sensor_max_range" default="8.0" doc="maximum sensor range in meters"/>
+
+    <!-- semantics (ScanNet20 label space, reused for 7Scenes runs) -->
+    <arg name="labelspace_name" default="scannet20_config"/>
+    <arg name="semantic_map_dir" default="$(find m2h_hmx_large)/config/colors"/>
+    <arg name="semantic_map_file" default="$(arg labelspace_name).csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <!-- For label-ids already mapped to ScanNet20, leave remap empty -->
+    <arg name="semantic_label_remap_filepath" default="" if="$(arg use_single_channel_label_image)"/>
+
+    <!-- labelspace configuration -->
+    <arg name="labelspace_dir" default="$(find m2h_hmx_large)/config/label_spaces"/>
+    <arg name="labelspace_path" default="$(arg labelspace_dir)/$(arg labelspace_name)_label_space.yaml"/>
+
+    <!-- logging output for hydra -->
+    <arg name="dataset_name" default="7scenes"/>
+    <arg name="dataset_config_name" default="7scenes" doc="input config name under mono_hydra/config/datasets"/>
+    <arg name="sequence_name" default="seq_unknown" doc="test sequence name, e.g. chess_seq-03"/>
+    <arg name="dsg_output_dir" default="$(find mono_hydra)/output/7scenes"/>
+    <arg name="dsg_output_prefix" default="$(arg sequence_name)"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+
+    <arg name="rgb_topic" default="/camera/color/image_raw"/>
+    <arg name="rgb_info_topic" default="/camera/color/camera_info"/>
+    <arg name="use_temporal_alignment" default="false"/>
+    <arg name="temporal_depth_topic" default="temporally_aligned/depth"/>
+    <arg name="temporal_label_topic" default="temporally_aligned/labels_argmax"/>
+    <arg name="temporal_color_topic" default="temporally_aligned/semantic"/>
+    <arg name="temporal_fixed_frame" default="$(arg odom_frame)"/>
+    <arg name="temporal_camera_info_topic" default="$(arg rgb_info_topic)"/>
+    <arg name="temporal_color_map_path" default="$(arg semantic_map_path)"/>
+    <arg name="temporal_history_size" default="3"/>
+    <arg name="temporal_max_history_age" default="0.3"/>
+    <arg name="temporal_depth_gate_abs" default="0.05"/>
+    <arg name="temporal_depth_gate_rel" default="0.02"/>
+    <arg name="temporal_label_min_votes" default="3"/>
+    <arg name="temporal_dynamic_labels" default=""/>
+    <arg name="depth_topic_raw" default="/camera/depth_cam/image_raw"/>
+    <arg name="label_topic_raw" default="/camera/seg_cam/labels_argmax"/>
+    <arg name="depth_topic" default="$(eval arg('temporal_depth_topic') if arg('use_temporal_alignment') else arg('depth_topic_raw'))"/>
+    <arg name="label_topic" default="$(eval arg('temporal_label_topic') if arg('use_temporal_alignment') else arg('label_topic_raw'))"/>
+    <arg name="publish_sensor_identity_tf" default="true" doc="publish identity TF so Hydra can start before VIO"/>
+
+
+    <node if="$(arg use_static_tfs)" pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_odom_map" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom map"/>
+    <node if="$(arg publish_scannet_world_tf)" pkg="tf2_ros" type="static_transform_publisher" name="scannet_world_tf" args="0.0 0.0 0.0 $(arg scannet_world_roll) $(arg scannet_world_pitch) $(arg scannet_world_yaw) $(arg scannet_world_parent) $(arg scannet_world_frame)"/>
+    <node if="$(arg publish_sensor_identity_tf)" pkg="tf2_ros" type="static_transform_publisher" name="scannet_robot_sensor_tf" args="0 0 0 0 0 0 $(arg robot_frame) $(arg sensor_frame)"/>
+    <!-- VIO publishes base_link_kimera -> scannet_camera (identity) -->
+    <node if="$(arg use_external_odom_tf)" pkg="mono_hydra" type="odom_to_tf.py" name="external_odom_tf_broadcaster" output="screen">
+        <param name="odom_topic" value="$(arg external_odom_topic)"/>
+        <param name="odom_frame_id" value="$(arg odom_frame)"/>
+        <param name="child_frame_id" value="$(arg robot_frame)"/>
+    </node>
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+        <arg name="rviz_file" value="scannet.rviz"/>
+        <arg name="rviz_dir" value="$(find mono_hydra)/rviz"/>
+        <arg name="input_config_path" value="$(find mono_hydra)/config/datasets/$(arg dataset_config_name).yaml"/>
+        <arg name="zmq_send_url" value="$(arg zmq_send_url)"/>
+        <arg name="zmq_recv_url" value="$(arg zmq_recv_url)"/>
+    </include>
+
+</launch>

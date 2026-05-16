@@ -1,0 +1,24 @@
+---
+name: Build and Test
+on: {push: {branches: [main]}, pull_request: {branches: [main]}}
+jobs:
+  ros2:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: src/ianvs}
+      - name: Dependencies
+        run: |
+          apt update
+          rosdep update --rosdistro jazzy && rosdep install --rosdistro jazzy --from-paths src --ignore-src -r -y
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --cmake-args --no-warn-unused-cli -DCMAKE_BUILD_TYPE=Release
+      - name: Test
+        shell: bash
+        run: |-
+          source /opt/ros/jazzy/setup.bash
+          colcon test --packages-select ianvs

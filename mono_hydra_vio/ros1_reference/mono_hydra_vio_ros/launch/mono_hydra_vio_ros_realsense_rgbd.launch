@@ -1,0 +1,48 @@
+<launch>
+  <arg name="dataset_name" value="RealSense_RGBD"/>
+
+  <arg name="online" default="true" />
+  <arg name="log_output" default="true"/>
+  <arg name="verbosity" default="0"/>
+  <arg name="debug" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+
+  <arg name="use_lcd" default="true"/>
+
+  <arg name="odom_frame_id" default="world"/>
+  <arg name="map_frame_id" default="map"/>
+  <arg name="base_link_frame_id" default="base_link_kimera"/>
+  <arg name="left_cam_frame_id"  default="left_cam_kimera"/>
+  <arg name="right_cam_frame_id" default="right_cam_kimera"/>
+
+  <arg name="viz_type" default="0"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="semantic_labelspace_file"
+      default="$(find mono_hydra)/config/label_spaces/nyud20_label_space.yaml"/>
+
+  <arg name="log_path" value="$(find mono_hydra_vio_ros)/output_logs/$(arg dataset_name)"/>
+
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros.launch" pass_all_args="true">
+      <!-- Options -->
+      <arg name="include_pipeline_flags" value="true"/>
+      <arg name="viz_type" value="$(arg viz_type)"/>
+      <arg name="use_rviz" value="$(arg use_rviz)"/> 
+      <!-- <arg name="viz_type" value="1"/>
+      <arg name="use_rviz" value="false"/> -->
+      <!-- Other settings -->
+      <arg name="log_gt_data" value="false"/>
+      <arg if="$(arg log_output)" name="log_output_path" value="$(arg log_path)"/>
+      <!-- Subscribed Topics -->
+      <arg name="left_cam_topic"      default="/camera/color/image_raw"/>
+      <arg name="depth_cam_topic" default="/camera/depth_cam/image_raw"/>
+      <!-- <arg name="semantic_mask_topic" default="/camera/seg_cam/labels_argmax"/> -->
+      <arg name="imu_topic"           default="/camera/imu"/>
+      <arg name="semantic_labelspace_file" value="$(arg semantic_labelspace_file)"/>
+      <!-- Only used when parsing a rosbag -->
+      <!-- <arg name="odom_frame_id"     value="world"/>
+      <arg name="base_link_frame_id" value="base_link"/>
+      <arg name="map_frame_id"       value="map"/>
+      <arg name="left_cam_frame_id"  value="left_cam"/>
+      <arg name="right_cam_frame_id" value="right_cam"/> -->
+  </include>
+</launch>

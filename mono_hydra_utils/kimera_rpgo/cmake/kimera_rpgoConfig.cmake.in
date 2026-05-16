@@ -1,0 +1,13 @@
+get_filename_component(kimera_rpgo_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+include(CMakeFindDependencyMacro)
+
+find_dependency(nlohmann_json REQUIRED)
+find_dependency(GTSAM REQUIRED)
+
+if(NOT TARGET kimera_rpgo::kimera_rpgo)
+  include("${kimera_rpgo_CMAKE_DIR}/kimera_rpgoTargets.cmake")
+endif()
+
+set(kimera_rpgo_LIBRARIES kimera_rpgo::kimera_rpgo)
+set(kimera_rpgo_FOUND_CATKIN_PROJECT TRUE)
+

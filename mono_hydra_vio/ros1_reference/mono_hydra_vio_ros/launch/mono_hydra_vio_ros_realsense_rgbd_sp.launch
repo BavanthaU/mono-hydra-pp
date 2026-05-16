@@ -1,0 +1,43 @@
+<launch>
+  <arg name="dataset_name" value="RealSense_RGBD_sp"/>
+
+  <arg name="online" default="true" />
+  <arg name="log_output" default="true"/>
+  <arg name="verbosity" default="0"/>
+  <arg name="debug" default="false"/>
+  <arg name="should_use_sim_time" default="true"/>
+  <arg name="torch_cuda_lib_path" default="/usr/local/lib/python3.10/site-packages/torch/lib"/>
+
+  <arg name="use_lcd" default="true"/>
+
+  <arg name="odom_frame_id" default="world"/>
+  <arg name="map_frame_id" default="map"/>
+  <arg name="base_link_frame_id" default="base_link_kimera"/>
+  <arg name="left_cam_frame_id"  default="left_cam_kimera"/>
+  <arg name="right_cam_frame_id" default="right_cam_kimera"/>
+
+  <arg name="log_path" value="$(find mono_hydra_vio_ros)/output_logs/$(arg dataset_name)"/>
+
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros.launch" pass_all_args="true">
+      <!-- Options -->
+      <arg name="include_pipeline_flags" value="true"/>
+      <arg name="viz_type" value="0"/>
+      <arg name="use_rviz" value="true"/> 
+      <arg name="extra_ld_library_path" value="$(arg torch_cuda_lib_path)"/>
+      <!-- <arg name="viz_type" value="1"/>
+      <arg name="use_rviz" value="false"/> -->
+      <!-- Other settings -->
+      <arg name="log_gt_data" value="false"/>
+      <arg if="$(arg log_output)" name="log_output_path" value="$(arg log_path)"/>
+      <!-- Subscribed Topics -->
+      <arg name="left_cam_topic"      default="/camera/color/image_raw"/>
+      <arg name="depth_cam_topic" default="/camera/depth_cam/image_raw"/>
+      <arg name="imu_topic"           default="/camera/imu"/>
+      <!-- Only used when parsing a rosbag -->
+      <!-- <arg name="odom_frame_id"     value="world"/>
+      <arg name="base_link_frame_id" value="base_link"/>
+      <arg name="map_frame_id"       value="map"/>
+      <arg name="left_cam_frame_id"  value="left_cam"/>
+      <arg name="right_cam_frame_id" value="right_cam"/> -->
+  </include>
+</launch>

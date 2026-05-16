@@ -1,0 +1,40 @@
+%YAML:1.0
+# General sensor definitions.
+camera_id: zed_camera_frame
+
+#T_ic:  (cam0 to imu0)
+T_BS:
+  cols: 4
+  rows: 4
+  data: [ 0.00005979, -0.00464006,  0.99998923,  0.01604871,
+          0.99997694,  0.00679145, -0.00002827, -0.00173569,
+          -0.00679125,  0.99996617,  0.00464036, -0.00292388,
+          0.0,       0.0,       0.0,       1.0]
+
+# # new
+# T_BS:
+#   cols: 4
+#   rows: 4
+#   data: [ 0.00252217, -0.01107109,  0.99993553,  0.01679952,
+#            0.99999565, -0.00150386, -0.00253897, -0.00234829,
+#           0.00153187,  0.99993758,  0.01106725,  0.00263572,
+#           0.0,       0.0,       0.0,       1.0]
+
+# Camera specific definitions.
+rate_hz: 30
+resolution: [480, 270]
+camera_model: pinhole
+intrinsics: [183.05268723190326, 183.76933616859407, 248.11647017659857, 142.41192917577118] #fu, fv, cu, cv
+# intrinsics: [186.03614801285988, 186.68301886815328, 247.4047954356837, 144.0353511534065] #fu, fv, cu, cv
+distortion_model: equidistant
+distortion_coefficients: [0.0, 0.0, 0.0, 0.0]
+# distortion_coefficients: [0.34909538991413047, 0.08402321989548972, -0.1202631423333384, 0.10270710018781751]
+# distortion_model: radtan
+# distortion_coefficients: [-0.02446212092336005, -0.010053020784166995, 0.0002847138879014482, -0.0013219178693822948]
+
+
+virtual_baseline: 0.3
+min_depth: 0.0
+depth_to_meters: 1.0
+max_depth: 10.0
+is_registered: 1

@@ -1,0 +1,28 @@
+dataset:
+  image_size: [480, 640]
+  num_classes: 40
+  min_depth: 0.1
+  max_depth: 10.0
+
+model:
+  num_classes: 40
+  min_depth: 0.1
+  max_depth: 10.0
+
+hmx:
+  backbone_name: facebook/dinov3-vitl16-pretrain-lvd1689m
+  decoder_dim: 256
+  ltc_window_size: 4
+  hm_d_state: 32
+  hm_drop_path: 0.1
+  gtf_extra_levels: 2
+  train_last_n_blocks: 24
+  intermediate_layer_indices: [5, 11, 17, 23]
+  num_register_tokens: 4
+  use_lora: true
+  lora_rank: 16
+  lora_alpha: 32.0
+  lora_dropout: 0.05
+  depth_bins: 64
+  edge_refine_threshold: 0.6
+  edge_refine_strength: 0.1

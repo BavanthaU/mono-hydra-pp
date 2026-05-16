@@ -1,0 +1,75 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+    <arg name="start_visualizer" default="true" />
+    <!-- configure Kimera VIO -->
+    <arg name="use_gt_frame" default="true"/>
+
+    <!-- pointcloud for hydra: no need to change -->
+    <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+    <!-- <arg name="pointcloud_topic" value="/semantic_pointcloud_clean"/> -->
+
+    <!-- Replace these with your actual sensor information -->
+    <!-- <arg name="sensor_frame" default="left_cam"/> -->
+    <!-- updated to suit kimera VIO -->
+    <arg name="sensor_frame" default="camera_color_optical_frame" if="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="camera_color_optical_frame" unless="$(arg use_gt_frame)"/>
+
+    <arg name="depth_topic" default="/camera/depth_cam/image_raw"/>
+    <!-- These should point to a 2D semantic segmentation image -->
+    <arg name="semantic_info_topic" default="/camera/color/camera_info"/>
+    <arg name="semantic_topic" default="/camera/seg_cam/image_raw"/>
+
+    <!-- semantic configuration -->
+    <arg name="semantic_map_path" default="$(find m2h)/config/nyud20_config.csv"/>
+    <arg name="typology_dir" default="$(find m2h)/config/d435i"/>
+    <arg name="typology_config" default="d435i_typology.yaml"/>
+
+
+    <!-- see uhumans2 launch file for how these are used -->
+    <arg name="dsg_output_dir" default="$(find mono_hydra)/output/ITC"/>
+    <arg name="dsg_output_prefix" default="office"/>
+
+    <!-- good starter rviz file, though topics could be edited for images -->
+    <arg name="rviz_dir" default="$(find mono_hydra)/rviz"/>
+    <arg name="rviz_file" default="real_cam.rviz"/>
+
+    <!-- turns rgb (or 2D semantics) + depth into pointcloud -->
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="rgb_info_topic" value="$(arg semantic_info_topic)"/>
+        <arg name="rgb_topic" value="$(arg semantic_topic)"/>
+        <arg name="depth_topic" value="$(arg depth_topic)"/>
+        <arg name="pointcloud_topic" value="$(arg pointcloud_topic)"/>
+    </include>
+
+    <!-- performs reconstruction and extracts places -->
+    <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
+	<arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
+        <arg name="config" value="d455_topology_config.yaml"/>
+        <arg name="semantic_config" default="nyud40_semantic_config.yaml"/>
+        <arg name="config_dir" value="$(find hydra_topology)/config"/>
+        <arg name="debug" value="false"/>
+        <!-- play with limits -->
+        <!-- <arg name="voxel_size" default="0.10"/>
+        <arg name="max_ray_length_m" default="3"/>
+        <arg name="update_period_s" default="0.5"/> -->
+        <arg name="voxel_size" default="0.10"/>
+        <arg name="max_ray_length_m" default="5.0"/>
+        <arg name="update_period_s" default=".5"/>
+    </include>
+
+    <!-- constructs rest of scene graph from reconstruction and places -->
+    <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true">
+        <arg name="robot_id" value="0"/>
+        <arg name="world_frame" value="world"/>
+        <arg name="use_oriented_bounding_boxes" value="false"/>
+        <arg name="config_dir" value="$(find hydra_dsg_builder)/config/uhumans2"/>
+        <arg name="enable_dsg_lcd" default="true"/>
+        <arg name="enable_lcd_viz" default="true"/>
+        <arg name="optimize_on_lc" default="true"/>
+    </include>
+     <!-- Launch static TF node from cam link to world -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="world_broadcaster"
+          args="0 0 0 0 0 0 1 world camera_link 100"/> -->
+</launch>
+

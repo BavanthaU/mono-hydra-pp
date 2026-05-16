@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>kimera_pgmo</name>
+  <version>0.0.1</version>
+  <description>Kimera PGMO</description>
+
+  <maintainer email="yunchang@mit.edu">Yun Chang</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  <depend>config_utilities</depend>
+  <depend>eigen</depend>
+  <depend>gtsam</depend>
+  <depend>kimera_rpgo</depend>
+  <depend>pose_graph_tools</depend>
+  <depend>spatial_hash</depend>
+
+  <export>
+      <build_type>cmake</build_type>
+  </export>
+</package>

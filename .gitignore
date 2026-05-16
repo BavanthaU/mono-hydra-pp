@@ -1,0 +1,66 @@
+# ROS 2 / colcon generated state
+build/
+install/
+log/
+CMakeFiles/
+.colcon/
+
+# Runtime products and datasets
+output/
+test_data/
+*.bag
+*.db3
+*.mcap
+metadata.yaml
+frames_*.gv
+frames_*.pdf
+
+# Local migration/debug notes from the porting process
+MIGRATION_*.md
+ISSUE_LOG.md
+RESUME_NEXT.md
+MONO_HYDRA_ROS1_REFERENCE_README.md
+ITC_PARITY_ANALYSIS.md
+
+# Python and local environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv*/
+venv/
+
+# Editor / OS noise
+.vscode/
+.idea/
+*~
+.DS_Store
+
+# Model artifacts are intentionally not part of the public GitHub submission.
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.trt
+*.weights
+*.safetensors
+
+# Keep documentation placeholders for the expected local model locations.
+!mono_hydra_perception/weights/README.md
+!mono_hydra_perception/onnx_models/README.md
+
+# Large binary dependencies generated or unpacked locally
+*.so
+*.so.*
+*.a
+*.dylib
+*.dll
+mono_hydra_vio/vocabulary/ORBvoc.yml
+mono_hydra_vio/ros1_reference/**/vocabulary/
+mono_hydra_vio/ros1_reference/**/third_party/onnxruntime-*/
+
+# Historical ROS 1 benchmark logs are kept locally, not in the public source tree.
+mono_hydra_vio/ros1_reference/**/output_logs/

@@ -1,0 +1,4 @@
+*.onnx filter=lfs diff=lfs merge=lfs -text
+third_party/onnxruntime/lib/libonnxruntime_providers_cuda.so filter=lfs diff=lfs merge=lfs -text
+third_party/onnxruntime-linux-x64-gpu-1.18.0/lib/libonnxruntime_providers_cuda.so filter=lfs diff=lfs merge=lfs -text
+third_party/onnxruntime-linux-x64-gpu-1.18.0/lib/libonnxruntime.so.1.18.0 filter=lfs diff=lfs merge=lfs -text

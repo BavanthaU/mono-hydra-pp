@@ -1,0 +1,84 @@
+%YAML:1.0
+# General sensor definitions.
+camera_id: zed_camera_frame
+
+# Sensor extrinsics wrt. the body-frame.
+# T_BS:
+#   cols: 4
+#   rows: 4
+#   data: [0.999960,  0.002280, -0.008633,  0.006079,
+#         -0.002297,  0.999995, -0.001998, -0.007089,
+#          0.008629,  0.002018,  0.999961,  0.001994,
+#          0.0,       0.0,       0.0,       1.0]
+
+# T_BS:
+#   cols: 4
+#   rows: 4
+#   data: [0.999960, -0.002297,  0.008629, -0.0061,
+#          0.002280,  0.999995,  0.002018,  0.00708,
+#         -0.008633, -0.001998,  0.999961, -0.00196,
+#          0.0,       0.0,       0.0,       1.0]
+
+# imu 
+T_BS:
+  cols: 4
+  rows: 4
+  data: [ 0.00005979, -0.00464006,  0.99998923,  0.01604871,
+          0.99997694,  0.00679145, -0.00002827, -0.00173569,
+          -0.00679125,  0.99996617,  0.00464036, -0.00292388,
+          0.0,       0.0,       0.0,       1.0]
+
+# Camera specific definitions.
+rate_hz: 30
+resolution: [480, 270]
+camera_model: pinhole
+intrinsics: [183.05268723190326, 183.76933616859407, 248.11647017659857, 142.41192917577118] #fu, fv, cu, cv
+distortion_model: equidistant
+distortion_coefficients: [0.0, 0.0, 0.0, 0.0]
+# distortion_coefficients: [0.34909538991413047, 0.08402321989548972, -0.1202631423333384, 0.10270710018781751]
+
+# header: 
+#   seq: 133
+#   stamp: 
+#     secs: 1735984736
+#     nsecs: 903924000
+#   frame_id: "zed_camera_frame"
+# height: 270
+# width: 480
+# distortion_model: "rational_polynomial"
+# D: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+# K: [168.98123168945312, 0.0, 250.17185974121094, 0.0, 181.5826873779297, 144.24427795410156, 0.0, 0.0, 1.0]
+# R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+# P: [168.98123168945312, 0.0, 250.17185974121094, 0.0, 0.0, 181.5826873779297, 144.24427795410156, 0.0, 0.0, 0.0, 1.0, 0.0]
+# binning_x: 0
+# binning_y: 0
+# roi: 
+#   x_offset: 0
+#   y_offset: 0
+#   height: 0
+#   width: 0
+#   do_rectify: False
+
+# I had to invert the following to make the IMU the base link
+# * Camera-IMU Translation: 
+# [component_container_isolated-2]  -0.0061 0.00708 -0.00196
+# [component_container_isolated-2] [INFO] [1736081678.023573733] [zed.zed_node]:   * Camera-IMU Rotation:
+# [component_container_isolated-2] FFFF5DD8CBA8
+# [component_container_isolated-2] 0.999960 -0.002297 0.008629
+# [component_container_isolated-2] 0.002280 0.999995 0.002018
+# [component_container_isolated-2] -0.008633 -0.001998 0.999961
+
+
+# Transformation (cam0):
+# -----------------------
+# T_ci:  (imu0 to cam0): 
+# [[ 0.00005979  0.99997694 -0.00679125  0.00171483]
+#  [-0.00464006  0.00679145  0.99996617  0.00301003]
+#  [ 0.99998923 -0.00002827  0.00464036 -0.01603502]
+#  [ 0.          0.          0.          1.        ]]
+
+# T_ic:  (cam0 to imu0): 
+# [[ 0.00005979 -0.00464006  0.99998923  0.01604871]
+#  [ 0.99997694  0.00679145 -0.00002827 -0.00173569]
+#  [-0.00679125  0.99996617  0.00464036 -0.00292388]
+#  [ 0.          0.          0.          1.        ]]

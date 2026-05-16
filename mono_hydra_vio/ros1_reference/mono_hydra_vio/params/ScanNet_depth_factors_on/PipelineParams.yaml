@@ -1,0 +1,15 @@
+%YAML:1.0
+# ScanNet RGB-D sparse-depth-factor ablation profile.
+# 0: MonoImu, 1: StereoImu, 2: RgbdImu
+frontend_type: 2
+
+# Use normal VioBackend in both ablation arms so the only intended difference
+# is use_sparse_depth_factors in BackendParams.yaml.
+# 0: VioBackend, 1: RegularVioBackend
+backend_type: 0
+
+# 0: OpenCV, 1: Pangolin
+display_type: 0
+
+# 0: Sequential, 1: Parallel
+parallel_run: 1

@@ -1,0 +1,20 @@
+%YAML:1.0
+# General sensor definitions.
+camera_id: scannet_camera
+
+# Sensor extrinsics wrt. the body-frame (identity: camera is the body).
+T_BS:
+  cols: 4
+  rows: 4
+  data: [1.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
+
+# Camera specific definitions.
+rate_hz: 30
+resolution: [1296, 968]  # [width, height]
+camera_model: pinhole
+intrinsics: [1169.62, 1167.11, 646.295, 489.927]  # [fu, fv, cu, cv]
+distortion_model: radtan
+distortion_coefficients: [0.0, 0.0, 0.0, 0.0]

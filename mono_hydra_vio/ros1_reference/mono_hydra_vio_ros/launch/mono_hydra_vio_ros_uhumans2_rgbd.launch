@@ -1,0 +1,36 @@
+<launch>
+  <arg name="dataset_name" value="uHumans2_RGBD"/>
+
+  <arg name="online" default="true" />
+  <arg name="log_output" default="true"/>
+  <arg name="verbosity" default="0"/>
+  <arg name="debug" default="false"/>
+  <arg name="should_use_sim_time" default="true"/>
+
+  <arg name="robot_name" default="tesse"/>
+  <arg name="use_lcd" default="true"/>
+
+  <arg name="log_path" value="$(find mono_hydra_vio_ros)/output_logs/$(arg dataset_name)"/>
+
+  <include file="$(find mono_hydra_vio_ros)/launch/mono_hydra_vio_ros.launch" pass_all_args="true">
+      <!-- Options -->
+      <arg name="include_pipeline_flags" value="true"/>
+       <arg name="viz_type" value="0"/>
+      <arg name="use_rviz" value="true"/> 
+      <!-- <arg name="viz_type" value="1"/>
+      <arg name="use_rviz" value="false"/> -->
+      <!-- Other settings -->
+      <arg name="log_gt_data" value="false"/>
+      <arg if="$(arg log_output)" name="log_output_path" value="$(arg log_path)"/>
+      <!-- Subscribed Topics -->
+      <arg name="left_cam_topic"        default="/$(arg robot_name)/left_cam/mono/image_raw"/>
+      <arg name="depth_cam_topic" default="/tesse/depth_cam/mono/image_raw"/>
+      <arg name="imu_topic"             default="/$(arg robot_name)/imu/clean/imu"/>
+      <!-- Only used when parsing a rosbag -->
+      <arg name="odom_frame_id" default="world"/>
+      <arg name="map_frame_id" default="map"/>
+      <arg name="base_link_frame_id" default="base_link_kimera"/>
+      <arg name="left_cam_frame_id"  default="left_cam_kimera"/>
+      <arg name="right_cam_frame_id" default="right_cam_kimera"/>
+  </include>
+</launch>

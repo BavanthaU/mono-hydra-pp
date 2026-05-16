@@ -1,0 +1,69 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <!-- Use an ITC-specific Hydra profile so corridor/room tuning does not leak into ScanNet. -->
+    <arg name="config_dir" default="$(find mono_hydra)/config/itc"/>
+    <!-- <arg name="config_dir" default="$(find hydra)/config/spot"/> -->
+    <arg name="use_gt_frame" default="false" doc="use simulator-provided tf frame"/>
+    <arg name="use_gt_semantics" default="true" doc="use simulator-provider semantics"/>
+    <arg name="use_static_tfs" default="true" doc="publish static tfs from file"/>
+    <arg name="color_mesh_by_label" default="true" doc="display mesh colored by semantic label"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="use_2d_places" default="true"/>
+    <arg name="use_single_channel_label_image" default="true"/>
+
+    <!-- ZMQ overrides -->
+    <arg name="zmq_ip" default="127.0.0.1"/>
+    <arg name="zmq_send_url" default="tcp://$(arg zmq_ip):8003"/>
+    <arg name="zmq_recv_url" default="tcp://$(arg zmq_ip):8004"/>
+
+    <arg name="robot_frame" default="$(eval 'camera_color_optical_frame' if arg('use_gt_frame') else 'base_link_kimera')" doc="robot body tf frame"/>
+    <arg name="odom_frame" default="$(eval 'world' if arg('use_gt_frame') else 'odom')" doc="odometry (map) frame"/>
+    <arg name="sensor_frame" default="$(eval 'left_cam' if arg('use_gt_frame') else 'left_cam_kimera')" doc="camera frame"/>
+
+    <!-- sensor range config -->
+    <arg name="sensor_min_range" default="0.1" doc="minimum sensor range in meters"/>
+    <arg name="sensor_max_range" default="5.0" doc="maximum sensor range in meters"/>
+
+    <!-- semantics -->
+    <arg name="labelspace_name" default="nyud20_config"/>
+    <arg name="semantic_map_dir" default="$(find m2h)/config/colors"/>
+    <arg name="semantic_map_file" default="$(arg labelspace_name).csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <!-- For label-ids already mapped to NYU20, leave remap empty -->
+    <arg name="semantic_label_remap_filepath" default="" if="$(arg use_single_channel_label_image)"/>
+
+     <!-- labelspace configuration -->
+    <arg name="labelspace_dir" default="$(find m2h)/config/label_spaces"/>
+    <arg name="labelspace_path" default="$(arg labelspace_dir)/$(arg labelspace_name)_label_space.yaml"/>
+
+    <!-- logging output for hydra -->
+    <arg name="dataset_name" default="itc"/> 
+    <arg name="dsg_output_dir" default="$(find mono_hydra)/output/"/>
+    <arg name="dsg_output_prefix" default="$(arg dataset_name)"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+
+    <!-- <arg name="rgb_topic" default="/cam0/image_raw"/> -->
+    <arg name="rgb_topic" default="/camera/color/image_raw"/>
+    <arg name="rgb_info_topic" default="/camera/color/camera_info"/>
+    <arg name="depth_topic" default="/camera/depth_cam/image_raw"/>
+    <arg name="label_topic" default="/camera/seg_cam/labels_argmax"/>
+    <!-- <arg name="prerecorded_topic" default="/oneformer/labels/image_raw"/> -->
+
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_7" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom map"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_8" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom world"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fake_world_tf" args="0 0 0 0 0 0 1 map world" if="$(arg use_gt_frame)"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 camera_color_optical_frame left_cam"/>
+    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 camera_color_optical_frame left_cam_kimera"/> -->
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+        <arg name="rviz_file" value="d435i.rviz"/>
+        <arg name="rviz_dir" value="$(find mono_hydra)/rviz"/>
+        <arg name="input_config_path" value="$(find mono_hydra)/config/datasets/$(arg dataset_name).yaml"/>
+        <arg name="zmq_send_url" value="$(arg zmq_send_url)"/>
+        <arg name="zmq_recv_url" value="$(arg zmq_recv_url)"/>
+    </include>
+
+</launch>

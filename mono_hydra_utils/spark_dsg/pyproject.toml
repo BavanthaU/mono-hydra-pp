@@ -1,0 +1,53 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11<3"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "spark_dsg"
+version = "1.1.3"
+description = "Library for representing 3D scene graphs"
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.8"
+dependencies = [
+    "click",
+    "numpy",
+    "shapely",
+    "zmq",
+]
+authors = [
+  {name ="Nathan Hughes", email = "na26933@mit.edu"},
+  {name ="Yun Chang", email = "yunchang@mit.edu"},
+]
+maintainers = [
+  {name ="Nathan Hughes", email = "na26933@mit.edu"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+viz = ["trimesh", "viser"]
+
+[project.urls]
+Repository = "https://github.com/MIT-SPARK/Spark-DSG"
+
+[project.scripts]
+spark-dsg = "spark_dsg.__main__:cli"
+
+[tool.scikit-build.cmake.define]
+SPARK_DSG_BUILD_PYTHON = "ON"
+SPARK_DSG_BUILD_EXAMPLES = "OFF"
+BUILD_TESTING = "OFF"
+BUILD_SHARED_LIBS = "OFF"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = true
+
+[tool.cibuildwheel]
+skip = ["*musl*", "*win32*"]
+archs = ["native"]
