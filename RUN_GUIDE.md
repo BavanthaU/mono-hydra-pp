@@ -83,18 +83,21 @@ src/mono_hydra_utils/mono_hydra_utils/scripts/convert_itc_ros1_bag_to_ros2.sh \
 
 ## ITC Run
 
-By default, ITC uses the full PyTorch M2H-HMX-Large model, not ONNX:
+By default, ITC uses the original ROS 1 M2H model path:
 
 ```text
-perception_backend: torch
+perception_backend: m2h
 perception_dataset: itc
-M2H config: mono_hydra_perception/config/m2h_hmx_v3_1_large_itc_mt_hr.yml
-M2H weights: mono_hydra_perception/weights/itc_large__miou_0.393_rmse_0.523_weights.pt
-model input size: 640x480
-depth_scale: 1.0
+M2H weights: mono_hydra_perception/weights/m2h_indoor.pt
+model input size: 256x256
+depth_output_scale: 0.967
 skip_frequency: 5
 Hydra LCD config: mono_hydra/config/hydra_itc_lcd.yaml
 ```
+
+`perception_backend:=torch` still launches the newer M2H-HMX-Large research
+model, but it is not the ITC production default because the ROS 1 benchmark used
+the original `m2h` package.
 
 For ITC, RVIO2 uses the raw RGB stream, while Kimera RGBD and Hydra consume the
 M2H-synchronized RGB/CameraInfo stream:
@@ -113,27 +116,93 @@ creates `/external_odometry` and `/mono_hydra_vio/odometry`; Kimera publishes
 publishes `base_link_kimera -> left_cam_kimera`. The static `map -> odom`
 helper is disabled for ITC so it cannot mask the LCD correction.
 
+The ITC ROS 2 defaults preserve dense ROS 1 parity: M2H reports output lag but
+does not drop already-processed RGB-D/semantic frames, Hydra's RGB-D receiver
+queue and Kimera sync queues are large enough to avoid starving mesh
+integration, and RViz uses the native `kimera_pgmo_rviz/MeshDisplay` plugin on
+Hydra's optimized backend mesh. The compiled mesh-marker bridge remains
+available only as an explicit fallback, not as part of the default ITC
+production run. Use a positive `perception_max_output_lag_s` only for
+low-latency debug views where incomplete/sparser mesh output is acceptable.
+
+### ROS 1-Style Four-Terminal Manual Run
+
+Use this when you want the same control split as the ROS 1 launch stack. Start
+Terminals 1-3 first, then start the bag paused in Terminal 4 and unpause when
+the nodes are ready. These commands run at recorded time; there is no `--rate`
+throttling. The small launch wrappers below hide component on/off plumbing so
+each terminal only exposes the knobs that belong to that component.
+
+Terminal 1: Hydra + RViz
+
+```bash
+cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+source install/setup.bash
+ros2 launch mono_hydra mono_hydra_itc_hydra.launch.py \
+  sequence_name:=itc_ros1_style_manual
+```
+
+Hydra loads `mono_hydra/config/hydra_itc_topics.yaml`; its backend keeps
+`optimize_on_lc: true`, matching the ROS 1 `optimize_on_lc:=true` behavior.
+RViz opens by default from this terminal.
+
+Terminal 2: RVIO2 -> external odom -> Kimera RGBD
+
+```bash
+cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+source install/setup.bash
+ros2 launch mono_hydra mono_hydra_itc_vio.launch.py \
+  sequence_name:=itc_ros1_style_manual \
+  enable_lcd:=true \
+  kimera_lcd_no_optimize:=true \
+  rvio2_input_pose_frame:=body \
+  odom_adapter_publish_tf:=false
+```
+
+`odom_adapter_publish_tf:=false` is the ROS 2 equivalent of the ROS 1
+`rvio2_publish_tf:=false`; Kimera owns the odom TF tree and publishes the
+Kimera TF links by default.
+
+Terminal 3: M2H HMX-Large
+
+```bash
+cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+source install/setup.bash
+ros2 launch mono_hydra mono_hydra_itc_m2h_hmx_large.launch.py \
+  dataset:=itc \
+  device:=auto \
+  half:=true \
+  skip_frequency:=3
+```
+
+This mirrors the explicit ROS 1 HMX-Large command. The launch wrapper keeps the
+ITC topics, simulated time, 640x480 output, `depth_scale:=1.0`, and synchronized
+RGB/CameraInfo publication fixed for the ITC stack.
+
+Terminal 4: bag replay
+
+```bash
+cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+source install/setup.bash
+ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
+  --clock --start-paused \
+  --qos-profile-overrides-path \
+  "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
+  --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
+```
+
+### Minimized ITC Run
+
+Use this only after the four-terminal run is behaving. It starts the stack in
+one launch and opens RViz by default.
+
 Terminal 1:
 
 ```bash
 cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  use_rviz:=false visualize:=false
-```
-
-For the RViz workflow:
-
-```bash
-ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  use_rviz:=true
-```
-
-Use the fixed-resolution ONNX export only when explicitly requested:
-
-```bash
-ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  use_rviz:=true perception_backend:=onnx
+  sequence_name:=itc_ros1_m2h_realtime
 ```
 
 Terminal 2:
@@ -141,14 +210,46 @@ Terminal 2:
 ```bash
 cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
-ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
-  --clock --qos-profile-overrides-path \
-  "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
-  --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
+$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/scripts/play_itc_full_loop_ros2.sh
 ```
 
 The reference commands use normal bag timing. ONNX remains opt-in via
-`perception_backend:=onnx`; the full model is the default path.
+`perception_backend:=onnx`; HMX-Large remains opt-in via
+`perception_backend:=torch`.
+
+## ScanNet Run
+
+The ROS 1 ScanNet bag has been converted locally to:
+
+```text
+test_data/scannet_ros2_bags/scene0000_00_ros2
+```
+
+Terminal 1: ScanNet stack + RViz
+
+```bash
+cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+source install/setup.bash
+ros2 launch mono_hydra mono_hydra_scannet.launch.py \
+  sequence_name:=scene0000_00 \
+  hydra_exit_after_clock:=true
+```
+
+Terminal 2: bag replay
+
+```bash
+cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+source install/setup.bash
+ros2 bag play test_data/scannet_ros2_bags/scene0000_00_ros2 \
+  --clock --start-paused \
+  --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
+```
+
+The ScanNet launch treats `/external_odometry` as a camera-pose input and
+normalizes it to `scannet_world -> base_link_kimera`, while keeping
+`base_link_kimera -> scannet_camera` as a static extrinsic. This avoids the
+camera-frame TF conflict that leaves Hydra waiting for sensor extrinsics and
+prevents RViz from showing the DSG.
 
 ## uHumans2 Run
 
@@ -156,27 +257,23 @@ The reference commands use normal bag timing. ONNX remains opt-in via
 cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_uhumans.launch.py \
-  use_rviz:=false visualize:=false use_sparse_depth_factors:=true \
+  use_sparse_depth_factors:=true \
   perception_backend:=torch
 ```
 
-RViz:
+For a headless run, add `use_rviz:=false visualize:=false`.
+
+Temporal alignment uses the same default RViz/native-mesh path:
 
 ```bash
 ros2 launch mono_hydra mono_hydra_uhumans.launch.py \
-  use_rviz:=true use_sparse_depth_factors:=true perception_backend:=torch
+  use_sparse_depth_factors:=true perception_backend:=torch \
+  use_temporal_alignment:=true temporal_history_size:=3 \
+  temporal_label_min_votes:=2
 ```
 
 Play the matching uHumans2 ROS 2 bag with `--clock` and the same TF QoS
 override file.
-
-To enable the ROS 1-derived temporal pose-warp filter for ablation runs:
-
-```bash
-ros2 launch mono_hydra mono_hydra_uhumans.launch.py \
-  use_rviz:=true perception_backend:=torch use_temporal_alignment:=true \
-  temporal_history_size:=3 temporal_label_min_votes:=2
-```
 
 ## 7Scenes Run
 
@@ -184,11 +281,12 @@ ros2 launch mono_hydra mono_hydra_uhumans.launch.py \
 cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_7scenes.launch.py \
-  use_rviz:=false visualize:=false perception_backend:=torch
+  perception_backend:=torch
 ```
 
 7Scenes keeps the dataset/external-odometry path until a calibrated RVIO2
-camera/IMU profile is added.
+camera/IMU profile is added. For a headless run, add
+`use_rviz:=false visualize:=false`.
 
 Temporal alignment can be enabled in the same way:
 
@@ -205,8 +303,11 @@ The ROS 2 visualizer config is:
 mono_hydra/rviz/mono_hydra_ros2.rviz
 ```
 
-`use_rviz:=true` starts `rviz2` with that config and also starts the official
-Hydra DSG marker visualizer. The Hydra visualizer publishes:
+The documented dataset commands leave `use_rviz` at its default `true`, so they
+start `rviz2` with this config and also start the official Hydra DSG marker
+visualizer. The mesh display is the native `kimera_pgmo_rviz/MeshDisplay` on
+`/hydra/backend/dsg_mesh`; the marker conversion bridge is not part of the
+default path. The Hydra visualizer publishes:
 
 ```text
 /hydra_visualizer/graph
@@ -240,7 +341,8 @@ outputs:
 /rvio2/trajectory
 /hydra_dsg_visualizer/dsg_markers
 /hydra_dsg_visualizer/agent_poses
-/hydra_dsg_visualizer/dsg_mesh_marker
+/hydra/backend/dsg_mesh
+/hydra_dsg_visualizer/dsg_mesh_marker   optional marker fallback
 /mono_hydra_vio_ros/graph_nodes
 /mono_hydra_vio_ros/graph_nodes_ids
 /mono_hydra_vio_ros/odometry_edges
@@ -278,8 +380,7 @@ ros2 topic hz /external_odometry
 ros2 topic hz /mono_hydra_vio/odometry
 ros2 topic echo --once /hydra_dsg_visualizer/dsg_markers \
   --qos-durability transient_local --qos-reliability reliable --no-arr
-ros2 topic echo --once /hydra_dsg_visualizer/dsg_mesh_marker \
-  --qos-durability transient_local --qos-reliability reliable --no-arr
+ros2 topic info -v /hydra/backend/dsg_mesh
 ros2 topic list | grep pose_graph
 ros2 topic info -v /mono_hydra_vio_ros/pose_graph_incremental
 ros2 run tf2_tools view_frames
@@ -335,27 +436,33 @@ layer_4_*      rooms
 layer_5_*      building
 ```
 
-Hydra publishes the mesh as `/hydra_dsg_visualizer/dsg_mesh`
-(`kimera_pgmo_msgs/msg/Mesh`). `mono_hydra_utils` converts that stream to
-`/hydra_dsg_visualizer/dsg_mesh_marker` so stock RViz2 can show the mesh layer.
-The launch default sets `mesh_alpha:=0.92`; lower it only if the mesh starts
-hiding the DSG graph.
+Hydra publishes the optimized backend mesh as `/hydra/backend/dsg_mesh`
+(`kimera_pgmo_msgs/msg/Mesh`). This workspace now builds the native ROS 2
+`kimera_pgmo_rviz/MeshDisplay` plugin from the MIT-SPARK/Kimera-PGMO `ros2`
+branch, so the default RViz config renders that backend mesh directly instead
+of through a marker conversion node or visualizer mesh republish.
+
+The compiled marker bridge remains available only as a fallback:
+
+```bash
+ros2 launch mono_hydra mono_hydra_itc_hydra.launch.py start_mesh_marker:=true
+```
+
+The fallback uses `mesh_alpha:=0.92`; lower it only if the mesh starts hiding
+the DSG graph.
 
 Loop closure is valid only when the benchmarked Kimera VIO ROS node publishes
 `/mono_hydra_vio_ros/pose_graph_incremental`.
 If `ros2 topic info -v /mono_hydra_vio_ros/pose_graph_incremental` reports
 `Publisher count: 0`, Hydra has no Kimera loop-closure proposal to optimize.
-The ITC rosbag launch defaults to the ROS 1 full-model path:
-`perception_backend:=torch`, `perception_dataset:=itc`,
-`m2h_hmx_v3_1_large_itc_mt_hr.yml`, `itc_large__miou_0.393_rmse_0.523_weights.pt`,
-`perception_depth_scale:=1.0`, `perception_image_width:=640`,
-`perception_image_height:=480`, `perception_skip_frequency:=5`, Kimera
+The ITC rosbag launch defaults to the ROS 1 production perception path:
+`perception_backend:=m2h`, `m2h_indoor.pt`, `256x256`,
+`m2h_depth_output_scale:=0.967`, `perception_skip_frequency:=5`, Kimera
 `RealSense_RGBD_RVIO2`,
 Hydra `RosPoseGraphs` under `/mono_hydra_vio_ros`, and
 `use_kimera_external_lc_bridge:=false`. It also loads the ROS 1 ITC Hydra LCD
 profile from `hydra_itc_lcd.yaml` instead of the generic default LCD profile.
-The ONNX backend remains available only when `perception_backend:=onnx` is
-explicitly provided.
+The ONNX and HMX-Large backends remain available only when explicitly provided.
 `hydra_exit_after_clock:=true` lets Hydra save `backend/loop_closures.csv`
 after the bag clock finishes. A manual `Ctrl-C` during backend optimization can
 kill Hydra before it writes the final CSV.
@@ -430,6 +537,9 @@ full-loop reference. The updated launch routes Kimera/Hydra through
 - ITC, 7Scenes, and uHumans route Kimera/Hydra RGB input through
   `/mono_hydra_perception/synced/image_raw` so delayed full-model depth/labels
   stay paired with the exact RGB frame.
+- ITC dense replay leaves `perception_max_output_lag_s:=0.0`, keeps large
+  Kimera/Hydra synchronization queues, and warns if M2H falls behind instead of
+  silently dropping RGB-D frames that Hydra needs for a complete mesh.
 - Sparse depth, semantic masking, SuperPoint mask input, Kimera temporal
   calibration, and temporal pose-warp filtering all remain launch-time switches
   for ablation runs.

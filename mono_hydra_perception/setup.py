@@ -28,6 +28,8 @@ setup(
             "mono_hydra_perception.*",
             "m2h_hmx_large",
             "m2h_hmx_large.*",
+            "m2h_core",
+            "m2h_core.*",
         ]
     ),
     data_files=package_data_files(),
@@ -41,6 +43,7 @@ setup(
     entry_points={
         "console_scripts": [
             "m2h_hmx_large_node = mono_hydra_perception.m2h_hmx_large_node:main",
+            "m2h_legacy_node = mono_hydra_perception.m2h_legacy_node:main",
             "m2h_onnx_node = mono_hydra_perception.m2h_onnx_node:main",
             "temporal_pose_warp_filter_node = mono_hydra_perception.temporal_pose_warp_filter_node:main",
         ],

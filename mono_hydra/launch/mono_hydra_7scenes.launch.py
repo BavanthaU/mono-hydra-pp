@@ -23,6 +23,9 @@ def generate_launch_description():
                     ),
                     "perception_dataset": "scannet",
                     "perception_input_queue_size": "3000",
+                    "perception_output_queue_size": "50",
+                    "perception_warn_output_lag_s": "5.0",
+                    "perception_max_output_lag_s": "0.0",
                     "perception_publish_synced_inputs": "true",
                     "perception_synced_rgb_topic": "/mono_hydra_perception/synced/image_raw",
                     "perception_synced_camera_info_topic": "/mono_hydra_perception/synced/camera_info",
@@ -40,6 +43,11 @@ def generate_launch_description():
                     "temporal_fixed_frame": "scannet_world",
                     "temporal_camera_info_topic": "/mono_hydra_perception/synced/camera_info",
                     "use_rvio2_bridge": "false",
+                    "rvio2_left_camera_params_path": PathJoinSubstitution(
+                        [FindPackageShare("mono_hydra_vio"), "params", "7Scenes", "LeftCameraParams.yaml"]
+                    ),
+                    "rvio2_input_pose_frame": "sensor",
+                    "odom_adapter_force_frame_ids": "true",
                     "kimera_params_folder": PathJoinSubstitution(
                         [FindPackageShare("mono_hydra_vio"), "params", "7Scenes"]
                     ),

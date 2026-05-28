@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /Scene Graph1/Scene Graph Static1
         - /Scene Graph1/DSG Mesh1
         - /Input1
         - /Input1/RGB1
@@ -13,7 +14,7 @@ Panels:
         - /VIO1
         - /Kimera Pose Graph1
       Splitter Ratio: 0.5
-    Tree Height: 684
+    Tree Height: 837
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -39,7 +40,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -52,7 +53,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 20
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/TF
       Enabled: false
       Filter (blacklist): ""
@@ -75,7 +76,28 @@ Visualization Manager:
           Enabled: true
           Name: Scene Graph Static
           Namespaces:
-            {}
+            interlayer_edges_2_3: true
+            interlayer_edges_3_2: true
+            interlayer_edges_4_3: true
+            layer_2_bounding_boxes: true
+            layer_2_nodes: true
+            layer_2_text: true
+            layer_2p97_edges: true
+            layer_2p97_nodes: true
+            layer_2p97_text: true
+            layer_3_edges: true
+            layer_3_nodes: true
+            layer_3_text: false
+            layer_3p1_edges: true
+            layer_3p1_nodes: true
+            layer_3p1_polygon_boundaries: true
+            layer_4_bounding_boxes: true
+            layer_4_edges: true
+            layer_4_nodes: true
+            layer_4_text: true
+            layer_5_bounding_boxes: true
+            layer_5_nodes: true
+            layer_5_text: true
           Topic:
             Depth: 5
             Durability Policy: Transient Local
@@ -83,19 +105,25 @@ Visualization Manager:
             Reliability Policy: Reliable
             Value: /hydra_dsg_visualizer/dsg_markers
           Value: true
-        - Class: rviz_default_plugins/Marker
+        - Class: kimera_pgmo_rviz/MeshDisplay
+          Cull Backfaces: false
+          Enable Lighting: false
           Enabled: true
           Name: DSG Mesh
-          Namespaces:
-            {}
           Topic:
-            Depth: 1
-            Durability Policy: Transient Local
+            Depth: 5
+            Durability Policy: Volatile
             Filter size: 10
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /hydra_dsg_visualizer/dsg_mesh_marker
+            Value: /hydra/backend/dsg_mesh
+          Toggle Visibility All: true
           Value: true
+          Visible:
+            Value: true
+            robot0:
+              Value: true
+              dsg_mesh: true
         - Class: rviz_default_plugins/MarkerArray
           Enabled: false
           Name: Scene Graph Dynamic
@@ -230,7 +258,7 @@ Visualization Manager:
           Buffer Length: 1
           Class: rviz_default_plugins/Path
           Color: 25; 255; 0
-          Enabled: true
+          Enabled: false
           Head Diameter: 0.30000001192092896
           Head Length: 0.20000000298023224
           Length: 0.30000001192092896
@@ -253,7 +281,7 @@ Visualization Manager:
             History Policy: Keep Last
             Reliability Policy: Reliable
             Value: /mono_hydra_vio/path
-          Value: true
+          Value: false
         - Alpha: 1
           Buffer Length: 1
           Class: rviz_default_plugins/Path
@@ -299,7 +327,7 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: true
-          Enabled: true
+          Enabled: false
           Keep: 1000
           Name: Unified Odometry
           Position Tolerance: 0.10000000149011612
@@ -320,7 +348,7 @@ Visualization Manager:
             History Policy: Keep Last
             Reliability Policy: Reliable
             Value: /mono_hydra_vio/odometry
-          Value: true
+          Value: false
       Enabled: true
       Name: VIO
     - Class: rviz_common/Group
@@ -496,25 +524,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 20.80084228515625
+      Distance: 31.336830139160156
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.3078067302703857
-        Y: -7.599557876586914
-        Z: 0.007943643257021904
+        X: 8.899800300598145
+        Y: 1.5310349464416504
+        Z: 12.968690872192383
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.2297973781824112
+      Pitch: 0.08979745209217072
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.316822052001953
+      Yaw: 5.361816883087158
     Saved: ~
 Window Geometry:
   Depth:
@@ -524,7 +552,7 @@ Window Geometry:
   Height: 1043
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd000000020000000000000253000003bdfc0200000006fb0000001800530065006d0061006e0074006900630020004900440073000000003b000000560000001600fffffffb000000100044006900730070006c006100790073010000003b000002e7000000c700fffffffb0000001200530065006c0065006300740069006f006e00000001770000008f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000001b1000000ac0000005c00fffffffb0000000a0056006900650077007300000002060000016d000000a000fffffffb0000000800540069006d00650100000328000000d00000003700ffffff0000000100000140000003bdfc0200000003fb00000006005200470042010000003b000001160000001600fffffffb0000001200530065006d0061006e007400690063007301000001570000011a0000001600fffffffb0000000a004400650070007400680100000277000001810000001600ffffff000003e1000003bd00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000003000000000000015600000380fc0200000005fb0000001800530065006d0061006e0074006900630020004900440073000000003b000000560000001600fffffffb000000100044006900730070006c006100790073010000003b00000380000000c700fffffffb0000001200530065006c0065006300740069006f006e00000001770000008f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000001b1000000ac0000005c00fffffffb0000000a0056006900650077007300000002060000016d000000a000ffffff000000010000014000000380fc0200000003fb00000006005200470042010000003b000001040000001600fffffffb0000001200530065006d0061006e00740069006300730100000145000001080000001600fffffffb0000000a004400650070007400680100000253000001680000001600ffffff000000030000078000000037fc0100000001fb0000000800540069006d00650100000000000007800000025300ffffff000004de0000038000000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   RGB:
     collapsed: false
   Selection:

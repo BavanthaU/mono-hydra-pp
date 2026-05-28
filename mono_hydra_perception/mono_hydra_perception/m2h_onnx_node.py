@@ -13,6 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge, CvBridgeError
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image
 
 
@@ -113,6 +114,9 @@ class M2HOnnxRos2Node(Node):
         self.declare_parameter("label_ids_topic", "/camera/seg_cam/labels_argmax")
         self.declare_parameter("image_semantic_topic", "/camera/seg_cam/image_raw")
         self.declare_parameter("input_queue_size", 256)
+        self.declare_parameter("output_queue_size", 10)
+        self.declare_parameter("warn_output_lag_s", 5.0)
+        self.declare_parameter("max_output_lag_s", 0.0)
         self.declare_parameter("publish_synced_inputs", False)
         self.declare_parameter("synced_rgb_topic", "/mono_hydra_perception/synced/image_raw")
         self.declare_parameter("synced_camera_info_topic", "/mono_hydra_perception/synced/camera_info")
@@ -144,6 +148,7 @@ class M2HOnnxRos2Node(Node):
             raise RuntimeError("ONNX Runtime is required for perception_backend:=onnx") from exc
 
         self.bridge = CvBridge()
+        self.use_sim_time = bool(self.get_parameter("use_sim_time").value)
         self.model_path = Path(str(self.get_parameter("model_path").value)).expanduser()
         if not self.model_path.is_file():
             raise FileNotFoundError(f"ONNX model not found: {self.model_path}")
@@ -153,6 +158,9 @@ class M2HOnnxRos2Node(Node):
         self.labels_topic = str(self.get_parameter("label_ids_topic").value)
         self.semantic_topic = str(self.get_parameter("image_semantic_topic").value)
         self.input_queue_size = max(1, int(self.get_parameter("input_queue_size").value))
+        self.output_queue_size = max(1, int(self.get_parameter("output_queue_size").value))
+        self.warn_output_lag_s = max(0.0, float(self.get_parameter("warn_output_lag_s").value))
+        self.max_output_lag_s = max(0.0, float(self.get_parameter("max_output_lag_s").value))
         self.publish_synced_inputs = bool(self.get_parameter("publish_synced_inputs").value)
         self.synced_rgb_topic = str(self.get_parameter("synced_rgb_topic").value)
         self.synced_camera_info_topic = str(self.get_parameter("synced_camera_info_topic").value)
@@ -189,21 +197,37 @@ class M2HOnnxRos2Node(Node):
         self.input_name = self.session.get_inputs()[0].name
         self.output_names = [output.name for output in self.session.get_outputs()]
 
-        self.depth_pub = self.create_publisher(Image, self.depth_topic, 2)
-        self.labels_pub = self.create_publisher(Image, self.labels_topic, 2)
-        self.semantic_pub = self.create_publisher(Image, self.semantic_topic, 2) if self.publish_color_semantic else None
+        self.depth_pub = self.create_publisher(Image, self.depth_topic, self.output_queue_size)
+        self.labels_pub = self.create_publisher(Image, self.labels_topic, self.output_queue_size)
+        self.semantic_pub = (
+            self.create_publisher(Image, self.semantic_topic, self.output_queue_size)
+            if self.publish_color_semantic
+            else None
+        )
         self.synced_rgb_pub = (
-            self.create_publisher(Image, self.synced_rgb_topic, 10) if self.publish_synced_inputs else None
+            self.create_publisher(Image, self.synced_rgb_topic, self.output_queue_size)
+            if self.publish_synced_inputs
+            else None
         )
         self.synced_camera_info_pub = (
-            self.create_publisher(CameraInfo, self.synced_camera_info_topic, 10)
+            self.create_publisher(CameraInfo, self.synced_camera_info_topic, self.output_queue_size)
             if self.publish_synced_inputs
             else None
         )
         self.latest_camera_info = None
+        image_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=self.input_queue_size,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+        )
+        camera_info_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
         if self.publish_synced_inputs:
-            self.create_subscription(CameraInfo, self.camera_info_topic, self._on_camera_info, self.input_queue_size)
-        self.create_subscription(Image, self.image_topic, self._on_image, self.input_queue_size)
+            self.create_subscription(CameraInfo, self.camera_info_topic, self._on_camera_info, camera_info_qos)
+        self.create_subscription(Image, self.image_topic, self._on_image, image_qos)
         self.frame_count = 0
         self.processed_count = 0
         self.total_inference_ms = 0.0
@@ -211,7 +235,9 @@ class M2HOnnxRos2Node(Node):
             f"ONNX M2H loaded model={self.model_path.name} providers={self.session.get_providers()} "
             f"size={self.input_width}x{self.input_height} skip={self.skip_frequency} "
             f"threads={self.intra_op_num_threads}/{self.inter_op_num_threads} "
-            f"queue={self.input_queue_size} synced_inputs={self.publish_synced_inputs}"
+            f"queue={self.input_queue_size} output_queue={self.output_queue_size} "
+            f"synced_inputs={self.publish_synced_inputs} input_qos=best_effort warn_lag={self.warn_output_lag_s:.1f}s "
+            f"drop_lag={self.max_output_lag_s:.1f}s"
         )
 
     def _on_camera_info(self, msg: CameraInfo) -> None:
@@ -237,6 +263,35 @@ class M2HOnnxRos2Node(Node):
         if image.ndim == 2:
             return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB), "rgb"
         return image[:, :, :3], self.input_color_order
+
+    def _output_lag_s(self, msg: Image):
+        if not self.use_sim_time:
+            return None
+        now_ns = self.get_clock().now().nanoseconds
+        stamp_ns = int(msg.header.stamp.sec) * 1_000_000_000 + int(msg.header.stamp.nanosec)
+        if now_ns <= 0 or stamp_ns <= 0:
+            return None
+        lag_s = (now_ns - stamp_ns) * 1.0e-9
+        return lag_s if lag_s >= 0.0 else None
+
+    def _should_drop_for_lag(self, msg: Image) -> bool:
+        lag_s = self._output_lag_s(msg)
+        if lag_s is None:
+            return False
+        if self.max_output_lag_s > 0.0 and lag_s > self.max_output_lag_s:
+            self.get_logger().warn(
+                "Dropping stale ONNX M2H frame %.1fs behind /clock."
+                % lag_s,
+                throttle_duration_sec=5.0,
+            )
+            return True
+        if self.warn_output_lag_s > 0.0 and lag_s > self.warn_output_lag_s:
+            self.get_logger().warn(
+                "ONNX M2H output is %.1fs behind /clock; real-time replay is outrunning perception."
+                % lag_s,
+                throttle_duration_sec=5.0,
+            )
+        return False
 
     def _select_outputs(self, outputs: Dict[str, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         depth = outputs[self.depth_output_name] if self.depth_output_name else None
@@ -283,6 +338,8 @@ class M2HOnnxRos2Node(Node):
     def _on_image(self, msg: Image) -> None:
         self.frame_count += 1
         if self.frame_count % self.skip_frequency != 0:
+            return
+        if self._should_drop_for_lag(msg):
             return
         try:
             image, order = self._image_to_cv(msg)

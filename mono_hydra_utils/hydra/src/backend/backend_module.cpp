@@ -80,7 +80,8 @@ void writeBackendStatus(const std::vector<BackendModuleStatus>& entries,
          << entry.total_factors << "," << entry.total_values << "," << entry.new_factors
          << "," << entry.new_graph_factors << "," << entry.trajectory_len << ","
          << entry.last_spin_s.value_or(nan) << "," << entry.last_opt_s.value_or(nan)
-         << "," << entry.last_mesh_update_s.value_or(nan) << entry.num_merges_undone
+         << "," << entry.last_mesh_update_s.value_or(nan) << ","
+         << entry.num_merges_undone
          << "\n";
   }
 

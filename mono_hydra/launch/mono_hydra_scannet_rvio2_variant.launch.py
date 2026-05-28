@@ -22,8 +22,10 @@ def generate_launch_description():
                     ),
                     "use_rvio2_bridge": "true",
                     "rvio2_trajectory_topic": "/rvio2/trajectory",
+                    "rvio2_input_pose_frame": "body",
                     "external_odom_topic": "/external_odometry",
                     "odom_adapter_publish_tf": "true",
+                    "odom_adapter_force_frame_ids": "true",
                     "enable_lcd": "true",
                 }.items(),
             )

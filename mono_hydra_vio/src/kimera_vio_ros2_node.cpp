@@ -466,7 +466,7 @@ class KimeraVioRos2Node : public rclcpp::Node {
       }
     });
     RCLCPP_INFO(get_logger(),
-                "Started benchmarked Kimera VIO ROS 2 node with params '%s'.",
+                "Started MonoHydra-VIO ROS 2 node with params '%s'.",
                 params_folder_path_.c_str());
   }
 

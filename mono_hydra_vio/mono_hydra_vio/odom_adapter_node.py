@@ -196,17 +196,24 @@ class OdomAdapterNode(Node):
         self._publish_static_tfs()
         self.get_logger().info(
             f"frames: map={self.map_frame_id} odom={self.odom_frame_id} "
-            f"base={self.base_link_frame_id} camera={self.camera_frame_id} publish_tf={self.publish_tf}"
+            f"base={self.base_link_frame_id} camera={self.camera_frame_id} publish_tf={self.publish_tf} "
+            f"input_pose_frame={self.input_pose_frame} force_frame_ids={self.force_frame_ids}"
         )
 
     def _normalize_odom(self, msg: Odometry) -> Odometry:
         odom = copy.deepcopy(msg)
-        if self.force_frame_ids or not odom.header.frame_id:
-            odom.header.frame_id = self.odom_frame_id
-        if self.force_frame_ids or not odom.child_frame_id:
-            odom.child_frame_id = self.base_link_frame_id
         if _stamp_is_zero(odom.header.stamp):
             odom.header.stamp = self.get_clock().now().to_msg()
+        if self.force_frame_ids or not odom.header.frame_id:
+            odom.header.frame_id = self.odom_frame_id
+
+        if self.input_pose_frame == "sensor" and self.sensor_T_body is not None:
+            world_T_sensor = _matrix_from_pose(odom.pose.pose)
+            world_T_body = world_T_sensor @ self.sensor_T_body
+            _assign_pose_from_matrix(odom.pose.pose, world_T_body)
+            odom.child_frame_id = self.base_link_frame_id
+        elif self.force_frame_ids or not odom.child_frame_id:
+            odom.child_frame_id = self.base_link_frame_id
         return odom
 
     def _on_odom(self, msg: Odometry) -> None:

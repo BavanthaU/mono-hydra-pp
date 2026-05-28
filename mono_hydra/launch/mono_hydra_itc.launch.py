@@ -1,13 +1,14 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
     return LaunchDescription(
         [
+            DeclareLaunchArgument("use_rviz", default_value="true"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     PathJoinSubstitution(
@@ -17,6 +18,7 @@ def generate_launch_description():
                 launch_arguments={
                     "dataset": "itc",
                     "sequence_name": "itc",
+                    "use_rviz": LaunchConfiguration("use_rviz"),
                     "labelspace_name": "nyud20_config",
                     "hydra_input_config_path": PathJoinSubstitution(
                         [FindPackageShare("mono_hydra"), "config", "hydra_itc_topics.yaml"]
@@ -31,8 +33,12 @@ def generate_launch_description():
                         [FindPackageShare("mono_hydra"), "config", "hydra_itc_lcd.yaml"]
                     ),
                     "perception_dataset": "itc",
+                    "perception_backend": "m2h",
                     "perception_skip_frequency": "5",
-                    "perception_input_queue_size": "3000",
+                    "perception_input_queue_size": "256",
+                    "perception_output_queue_size": "10",
+                    "perception_warn_output_lag_s": "5.0",
+                    "perception_max_output_lag_s": "0.0",
                     "perception_publish_synced_inputs": "true",
                     "perception_synced_rgb_topic": "/mono_hydra_perception/synced/image_raw",
                     "perception_synced_camera_info_topic": "/mono_hydra_perception/synced/camera_info",

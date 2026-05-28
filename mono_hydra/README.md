@@ -15,14 +15,13 @@ ros2 launch mono_hydra mono_hydra_7scenes.launch.py
 ros2 launch mono_hydra mono_hydra_scannet.launch.py
 ```
 
-The main launch accepts `perception_backend:=torch` for the stock
-M2H-HMX-Large model and `perception_backend:=onnx` for the fixed-resolution
-ONNX export imported from the older inference package.
+The main launch accepts `perception_backend:=m2h` for the original ROS 1 ITC
+M2H model, `perception_backend:=torch` for the newer M2H-HMX-Large model, and
+`perception_backend:=onnx` for the fixed-resolution ONNX export.
 
-Dataset launch files default to the stock PyTorch model. For ITC, the default
-configuration is `m2h_hmx_v3_1_large_itc_mt_hr.yml` with
-`itc_large__miou_0.393_rmse_0.523_weights.pt`. ONNX is an explicit override for
-fixed-resolution inference checks, not the default publication run.
+ITC defaults to `perception_backend:=m2h` because the benchmarked ROS 1 ITC
+stack used the original `m2h` package with `m2h_indoor.pt`. HMX-Large and ONNX
+remain explicit overrides for research and inference checks.
 
 ## Runtime Graph
 
@@ -42,7 +41,7 @@ backend using Kimera-PGMO and Kimera-RPGO.
 
 | Dataset | Perception | Pose source | Label space |
 | --- | --- | --- | --- |
-| ITC | M2H-HMX-Large ITC | R-VIO2 | NYUD20 |
+| ITC | original M2H `m2h_indoor.pt` | R-VIO2 | NYUD20 |
 | uHumans2 office | M2H-HMX-Large NYUD | R-VIO2 | NYUD20 |
 | 7Scenes | M2H-HMX-Large ScanNet | dataset odometry until calibrated R-VIO2 config is added | ScanNet20 |
 | ScanNet | M2H-HMX-Large ScanNet | dataset odometry or supplied R-VIO2 bridge | ScanNet20 |
@@ -66,21 +65,20 @@ src/mono_hydra_utils/mono_hydra_utils/scripts/convert_itc_ros1_bag_to_ros2.sh \
   /home/bavantha/ros1_workspaces/hydra2_ws/data/itc/ITC_2nd_floor_full_loop.bag
 ```
 
-Run ITC:
+Run ITC with the ROS 2 RViz visualizer:
+
+```bash
+ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py
+```
+
+Run ITC headless:
 
 ```bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
   use_rviz:=false visualize:=false
 ```
 
-Run ITC with the ROS 2 RViz visualizer:
-
-```bash
-ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  use_rviz:=true
-```
-
-`use_rviz:=true` opens `rviz/mono_hydra_ros2.rviz` and starts the official
+ITC launches open `rviz/mono_hydra_ros2.rviz` by default and start the official
 Hydra DSG marker visualizer. The RViz layout follows the ROS 1 workflow: the
 Displays/config tree is docked on the left, RGB/depth/semantic image panels are
 docked on the right, the 3D scene graph stays in the center, and the Time panel
@@ -91,15 +89,14 @@ Hydra DSG/backend marker outputs.
 Play the converted bag:
 
 ```bash
-ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
-  --clock --qos-profile-overrides-path \
-  "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
-  --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
+$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/scripts/play_itc_full_loop_ros2.sh
 ```
 
 Converted ROS 1 bags should not replay their original `/tf` or `/tf_static`
 into the Mono Hydra stack. The launch files publish the benchmark frame chain
 used by Hydra and RViz.
+
+The helper plays at the normal real-time rosbag rate.
 
 For ITC, allow roughly 30-60 seconds of playback before checking the DSG marker
 topic because RVIO2 starts publishing usable poses after the first few RGB/IMU

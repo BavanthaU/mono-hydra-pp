@@ -156,6 +156,57 @@ def _perception_nodes(context):
         _as_bool(LaunchConfiguration("perception_publish_color_semantic").perform(context))
         or _as_bool(LaunchConfiguration("use_rviz").perform(context))
     )
+    if backend in ("m2h", "legacy", "original", "original_m2h"):
+        return [
+            Node(
+                package="mono_hydra_perception",
+                executable="m2h_legacy_node",
+                name="mono_hydra_perception",
+                output="screen",
+                parameters=[
+                    {
+                        "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
+                        "image_topic": LaunchConfiguration("rgb_topic"),
+                        "camera_info_topic": LaunchConfiguration("camera_info_topic"),
+                        "image_depth_topic": perception_depth_topic,
+                        "image_semantic_topic": perception_semantic_color_topic,
+                        "label_ids_topic": perception_label_topic,
+                        "input_queue_size": ParameterValue(
+                            LaunchConfiguration("perception_input_queue_size"), value_type=int
+                        ),
+                        "output_queue_size": ParameterValue(
+                            LaunchConfiguration("perception_output_queue_size"), value_type=int
+                        ),
+                        "warn_output_lag_s": ParameterValue(
+                            LaunchConfiguration("perception_warn_output_lag_s"), value_type=float
+                        ),
+                        "max_output_lag_s": ParameterValue(
+                            LaunchConfiguration("perception_max_output_lag_s"), value_type=float
+                        ),
+                        "publish_synced_inputs": ParameterValue(
+                            LaunchConfiguration("perception_publish_synced_inputs"), value_type=bool
+                        ),
+                        "synced_rgb_topic": LaunchConfiguration("perception_synced_rgb_topic"),
+                        "synced_camera_info_topic": LaunchConfiguration("perception_synced_camera_info_topic"),
+                        "publish_label_ids": True,
+                        "publish_color_semantic": ParameterValue(publish_color_semantic, value_type=bool),
+                        "model_path": LaunchConfiguration("m2h_model_path"),
+                        "feed_width": ParameterValue(LaunchConfiguration("m2h_feed_width"), value_type=int),
+                        "feed_height": ParameterValue(LaunchConfiguration("m2h_feed_height"), value_type=int),
+                        "skip_frequency": ParameterValue(LaunchConfiguration("perception_skip_frequency"), value_type=int),
+                        "arch_name": LaunchConfiguration("m2h_arch_name"),
+                        "model_variant": LaunchConfiguration("m2h_model_variant"),
+                        "num_classes": ParameterValue(LaunchConfiguration("m2h_num_classes"), value_type=int),
+                        "depth_output_scale": ParameterValue(
+                            LaunchConfiguration("m2h_depth_output_scale"), value_type=float
+                        ),
+                        "color20_mat_filepath": LaunchConfiguration("m2h_color20_mat_filepath"),
+                        "objects40_csv_mapping": LaunchConfiguration("m2h_objects40_csv_mapping"),
+                    }
+                ],
+            )
+        ]
+
     if backend in ("torch", "pytorch", "stock"):
         return [
             Node(
@@ -180,6 +231,15 @@ def _perception_nodes(context):
                         "label_ids_topic": perception_label_topic,
                         "input_queue_size": ParameterValue(
                             LaunchConfiguration("perception_input_queue_size"), value_type=int
+                        ),
+                        "output_queue_size": ParameterValue(
+                            LaunchConfiguration("perception_output_queue_size"), value_type=int
+                        ),
+                        "warn_output_lag_s": ParameterValue(
+                            LaunchConfiguration("perception_warn_output_lag_s"), value_type=float
+                        ),
+                        "max_output_lag_s": ParameterValue(
+                            LaunchConfiguration("perception_max_output_lag_s"), value_type=float
                         ),
                         "publish_synced_inputs": ParameterValue(
                             LaunchConfiguration("perception_publish_synced_inputs"), value_type=bool
@@ -221,6 +281,15 @@ def _perception_nodes(context):
                         "input_queue_size": ParameterValue(
                             LaunchConfiguration("perception_input_queue_size"), value_type=int
                         ),
+                        "output_queue_size": ParameterValue(
+                            LaunchConfiguration("perception_output_queue_size"), value_type=int
+                        ),
+                        "warn_output_lag_s": ParameterValue(
+                            LaunchConfiguration("perception_warn_output_lag_s"), value_type=float
+                        ),
+                        "max_output_lag_s": ParameterValue(
+                            LaunchConfiguration("perception_max_output_lag_s"), value_type=float
+                        ),
                         "publish_synced_inputs": ParameterValue(
                             LaunchConfiguration("perception_publish_synced_inputs"), value_type=bool
                         ),
@@ -244,7 +313,7 @@ def _perception_nodes(context):
             )
         ]
 
-    raise RuntimeError(f"Unknown perception_backend '{backend}'. Use 'torch' or 'onnx'.")
+    raise RuntimeError(f"Unknown perception_backend '{backend}'. Use 'm2h', 'torch', or 'onnx'.")
 
 
 def _temporal_alignment_node(context):
@@ -342,9 +411,10 @@ def generate_launch_description():
     )
     declared = [
         DeclareLaunchArgument("use_sim_time", default_value="true"),
-        DeclareLaunchArgument("use_rviz", default_value="false"),
+        DeclareLaunchArgument("use_rviz", default_value="true"),
         DeclareLaunchArgument("visualize", default_value="false"),
-        DeclareLaunchArgument("start_mesh_marker", default_value="true"),
+        DeclareLaunchArgument("start_mesh_marker", default_value="false"),
+        DeclareLaunchArgument("mesh_marker_input_topic", default_value="/hydra/backend/dsg_mesh"),
         DeclareLaunchArgument("mesh_alpha", default_value="0.92"),
         DeclareLaunchArgument(
             "rviz_config",
@@ -371,6 +441,9 @@ def generate_launch_description():
         DeclareLaunchArgument("perception_publish_color_semantic", default_value="false"),
         DeclareLaunchArgument("perception_skip_frequency", default_value="3"),
         DeclareLaunchArgument("perception_input_queue_size", default_value="256"),
+        DeclareLaunchArgument("perception_output_queue_size", default_value="10"),
+        DeclareLaunchArgument("perception_warn_output_lag_s", default_value="5.0"),
+        DeclareLaunchArgument("perception_max_output_lag_s", default_value="0.0"),
         DeclareLaunchArgument("perception_depth_topic", default_value="/camera/depth_cam/image_raw"),
         DeclareLaunchArgument("perception_label_topic", default_value="/camera/seg_cam/labels_argmax"),
         DeclareLaunchArgument("perception_semantic_color_topic", default_value="/camera/seg_cam/image_raw"),
@@ -384,6 +457,28 @@ def generate_launch_description():
         DeclareLaunchArgument("perception_checkpoint_path", default_value=""),
         DeclareLaunchArgument("perception_label_mapping_yaml", default_value=""),
         DeclareLaunchArgument("perception_color_map_path", default_value=""),
+        DeclareLaunchArgument(
+            "m2h_model_path",
+            default_value=PathJoinSubstitution([FindPackageShare("mono_hydra_perception"), "weights", "m2h_indoor.pt"]),
+        ),
+        DeclareLaunchArgument("m2h_feed_width", default_value="256"),
+        DeclareLaunchArgument("m2h_feed_height", default_value="256"),
+        DeclareLaunchArgument("m2h_arch_name", default_value="vit_small"),
+        DeclareLaunchArgument("m2h_model_variant", default_value="default"),
+        DeclareLaunchArgument("m2h_num_classes", default_value="41"),
+        DeclareLaunchArgument("m2h_depth_output_scale", default_value="0.967"),
+        DeclareLaunchArgument(
+            "m2h_color20_mat_filepath",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("mono_hydra_perception"), "config", "colors", "color_config20.mat"]
+            ),
+        ),
+        DeclareLaunchArgument(
+            "m2h_objects40_csv_mapping",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("mono_hydra_perception"), "config", "colors", "nyud40_config.yaml"]
+            ),
+        ),
         DeclareLaunchArgument("onnx_model_path", default_value=""),
         DeclareLaunchArgument("onnx_input_width", default_value="416"),
         DeclareLaunchArgument("onnx_input_height", default_value="320"),
@@ -394,6 +489,7 @@ def generate_launch_description():
         DeclareLaunchArgument("use_rvio2_backend", default_value="false"),
         DeclareLaunchArgument("use_rvio2_bridge", default_value="false"),
         DeclareLaunchArgument("odom_adapter_publish_tf", default_value="true"),
+        DeclareLaunchArgument("odom_adapter_force_frame_ids", default_value="true"),
         DeclareLaunchArgument("use_kimera_vio_ros_node", default_value="true"),
         DeclareLaunchArgument(
             "kimera_params_folder",
@@ -444,8 +540,13 @@ def generate_launch_description():
         DeclareLaunchArgument("rvio2_trajectory_topic", default_value="/rvio2/trajectory"),
         DeclareLaunchArgument("rvio2_config_path", default_value=""),
         DeclareLaunchArgument("rvio2_mono_image_topic", default_value="/rvio2/cam0/image_raw"),
-        DeclareLaunchArgument("rvio2_left_camera_params_path", default_value=""),
-        DeclareLaunchArgument("rvio2_input_pose_frame", default_value="body"),
+        DeclareLaunchArgument(
+            "rvio2_left_camera_params_path",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("mono_hydra_vio"), "params", "ScanNet", "LeftCameraParams.yaml"]
+            ),
+        ),
+        DeclareLaunchArgument("rvio2_input_pose_frame", default_value="sensor"),
         DeclareLaunchArgument("use_kimera_pose_graph_bridge", default_value="true"),
         DeclareLaunchArgument("kimera_pose_graph_topic", default_value="/mono_hydra_vio_ros/pose_graph"),
         DeclareLaunchArgument(
@@ -627,6 +728,9 @@ def generate_launch_description():
                 "base_link_frame_id": LaunchConfiguration("robot_frame"),
                 "camera_frame_id": LaunchConfiguration("camera_frame"),
                 "path_max_length": 5000,
+                "force_frame_ids": ParameterValue(
+                    LaunchConfiguration("odom_adapter_force_frame_ids"), value_type=bool
+                ),
                 "left_camera_params_path": LaunchConfiguration("rvio2_left_camera_params_path"),
                 "input_pose_frame": LaunchConfiguration("rvio2_input_pose_frame"),
             }
@@ -742,7 +846,7 @@ def generate_launch_description():
         parameters=[
             {
                 "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
-                "input_mesh_topic": "/hydra_dsg_visualizer/dsg_mesh",
+                "input_mesh_topic": LaunchConfiguration("mesh_marker_input_topic"),
                 "output_marker_topic": "/hydra_dsg_visualizer/dsg_mesh_marker",
                 "fallback_frame_id": LaunchConfiguration("map_frame"),
                 "mesh_alpha": ParameterValue(LaunchConfiguration("mesh_alpha"), value_type=float),

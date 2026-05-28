@@ -15,8 +15,11 @@ mono_hydra_utils.runtime_checks
 `workspace` centralizes workspace path discovery. `bag_conversion` owns the
 ROS 1 to ROS 2 bag conversion workflow used by ITC. `runtime_checks` validates
 the deep-learning runtime used by the M2H-HMX-Large backends.
-`mesh_marker_node` converts Hydra's Kimera-PGMO mesh topic to a standard RViz2
-`visualization_msgs/Marker` triangle list for the Mono Hydra RViz layout.
+`kimera_pgmo_rviz/MeshDisplay` is built from the vendored Kimera-PGMO ROS 2
+RViz package and is the default optimized-mesh display path. `mesh_marker_node`
+is an optional fallback that converts Hydra's Kimera-PGMO mesh topic to a
+standard RViz2 `visualization_msgs/Marker` triangle list. The older Python
+bridge is still installed as `mesh_marker_node_py` for debugging.
 
 ## Configuration
 

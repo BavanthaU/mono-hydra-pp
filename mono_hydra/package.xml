@@ -14,6 +14,7 @@
   <exec_depend>hydra</exec_depend>
   <exec_depend>hydra_ros</exec_depend>
   <exec_depend>hydra_visualizer</exec_depend>
+  <exec_depend>kimera_pgmo_rviz</exec_depend>
   <exec_depend>mono_hydra_perception</exec_depend>
   <exec_depend>mono_hydra_utils</exec_depend>
   <exec_depend>mono_hydra_vio</exec_depend>

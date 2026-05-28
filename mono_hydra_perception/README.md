@@ -8,16 +8,19 @@ expected by Hydra and the VIO feature interface.
 
 | Backend | Launch value | Model source | Resolution |
 | --- | --- | --- | --- |
+| Original ITC M2H | `perception_backend:=m2h` | ROS 1 `m2h_indoor.pt` and `m2h_core` port | `256x256` |
 | Stock M2H-HMX-Large | `perception_backend:=torch` | vendored PyTorch configs and checkpoints | dataset-configured, overrideable |
 | ONNX export | `perception_backend:=onnx` | imported `scannet_depth_sem_320x416.onnx` model | fixed `320x416` input |
 
-The stock backend supports the ITC, ScanNet, and NYUD/uHumans model profiles.
-The ONNX backend was imported from the older `m2h_inference_ros` package and is
-kept here so the ROS 2 workspace is independent from ROS 1 workspaces.
+The original ITC M2H backend is the default for ITC parity because the ROS 1
+benchmark launches `roslaunch m2h m2h.launch`. The HMX-Large backend supports
+ITC, ScanNet, and NYUD/uHumans research profiles. The ONNX backend was imported
+from the older `m2h_inference_ros` package and is kept here so the ROS 2
+workspace is independent from ROS 1 workspaces.
 
-Both inference backends can publish synchronized RGB and CameraInfo alongside
+All inference backends can publish synchronized RGB and CameraInfo alongside
 each depth/label prediction. Dataset launches use that stream for Kimera RGBD
-and Hydra so full-model inference latency does not break RGB-depth pairing:
+and Hydra so perception latency does not break RGB-depth pairing:
 
 ```text
 /mono_hydra_perception/synced/image_raw
@@ -27,6 +30,11 @@ and Hydra so full-model inference latency does not break RGB-depth pairing:
 The ROS 1 temporal pose-warp filter is ported as
 `temporal_pose_warp_filter_node` and is enabled from launch with
 `use_temporal_alignment:=true`.
+
+For simulated rosbag runs, both backends also report when output frames are
+behind `/clock`. `perception_max_output_lag_s:=0.0` preserves every processed
+frame for dense parity; setting it to a positive value drops stale frames and is
+useful for responsive RViz debugging when playback outruns inference.
 
 ## Topics
 
