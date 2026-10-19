@@ -256,7 +256,7 @@ upstream code. MIT SPARK Hydra and the other third-party projects under
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the license files in each
 vendored source directory.
 
-## Acknowledgements and Citation
+## Acknowledgements
 
 This work builds on major open-source robotics systems:
 
@@ -278,5 +278,85 @@ This work builds on major open-source robotics systems:
 - GTSAM: https://github.com/borglab/gtsam. Cite Dellaert, “Factor Graphs and
   GTSAM: A Hands-on Introduction,” 2012.
 
-Please also cite the Mono Hydra papers associated with this repository and the
-M2H-HMX-Large perception model in journal submissions.
+## Bibliography and citation
+
+If you use this repository, please cite Mono-Hydra++ and the relevant perception
+and mapping papers below, alongside the upstream systems acknowledged above.
+
+1. **Mono-Hydra++** — U. V. B. L. Udugama, George Vosselman, and Francesco Nex.
+   *Mono-Hydra++: Real-Time Monocular Scene Graph Construction with Multi-Task
+   Learning for 3D Indoor Mapping.* 2026. Under review at the **ISPRS Journal of
+   Photogrammetry and Remote Sensing**; revised manuscript submitted following
+   the first review cycle. [Preprint](https://arxiv.org/abs/2605.17661).
+
+2. **M2H-MX** — U. V. B. L. Udugama, George Vosselman, and Francesco Nex.
+   *M2H-MX: Multi-Task Semantic and Geometric Perception for Real-Time Monocular
+   3D Scene Graph Construction.* **ICRA 2026, SRRA Workshop**, 2026 (accepted).
+   [Publication details](https://bavanthau.github.io/publications/)
+   · [Preprint](https://arxiv.org/abs/2603.29236).
+
+3. **M2H** — U. V. B. L. Udugama, George Vosselman, and Francesco Nex.
+   *M2H: Multi-Task Learning with Efficient Window-Based Cross-Task Attention
+   for Monocular Spatial Perception.* **IEEE/RSJ International Conference on
+   Intelligent Robots and Systems (IROS)**, 2025.
+   [DOI](https://doi.org/10.1109/IROS60139.2025.11246974)
+   · [Preprint](https://arxiv.org/abs/2510.17363).
+
+4. **Mono-Hydra** — U. V. B. L. Udugama, G. Vosselman, and F. Nex.
+   *Mono-Hydra: Real-Time 3D Scene Graph Construction from Monocular Camera
+   Input with IMU.* **ISPRS Annals of the Photogrammetry, Remote Sensing and
+   Spatial Information Sciences**, X-1/W1-2023, 439–445, 2023.
+   [DOI](https://doi.org/10.5194/isprs-annals-X-1-W1-2023-439-2023)
+   · [Preprint](https://arxiv.org/abs/2308.05515).
+
+<details>
+<summary><strong>BibTeX — copy the relevant entries</strong></summary>
+
+```bibtex
+@unpublished{udugama2026monohydrapp,
+  title         = {{Mono-Hydra++}: Real-Time Monocular Scene Graph Construction with Multi-Task Learning for {3D} Indoor Mapping},
+  author        = {Udugama, U. V. B. L. and Vosselman, George and Nex, Francesco},
+  year          = {2026},
+  note          = {Under review at ISPRS Journal of Photogrammetry and Remote Sensing},
+  eprint        = {2605.17661},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO},
+  doi           = {10.48550/arXiv.2605.17661},
+  url           = {https://arxiv.org/abs/2605.17661}
+}
+
+@inproceedings{udugama2026m2hmx,
+  title         = {{M2H-MX}: Multi-Task Semantic and Geometric Perception for Real-Time Monocular {3D} Scene Graph Construction},
+  author        = {Udugama, U. V. B. L. and Vosselman, George and Nex, Francesco},
+  booktitle     = {IEEE International Conference on Robotics and Automation (ICRA), SRRA Workshop},
+  year          = {2026},
+  note          = {Accepted},
+  eprint        = {2603.29236},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/2603.29236}
+}
+
+@inproceedings{udugama2025m2h,
+  title         = {{M2H}: Multi-Task Learning with Efficient Window-Based Cross-Task Attention for Monocular Spatial Perception},
+  author        = {Udugama, U. V. B. L. and Vosselman, George and Nex, Francesco},
+  booktitle     = {2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year          = {2025},
+  doi           = {10.1109/IROS60139.2025.11246974},
+  eprint        = {2510.17363},
+  archivePrefix = {arXiv},
+  url           = {https://doi.org/10.1109/IROS60139.2025.11246974}
+}
+
+@article{udugama2023monohydra,
+  title   = {{Mono-Hydra}: Real-Time {3D} Scene Graph Construction from Monocular Camera Input with {IMU}},
+  author  = {Udugama, U. V. B. L. and Vosselman, G. and Nex, F.},
+  journal = {ISPRS Annals of the Photogrammetry, Remote Sensing and Spatial Information Sciences},
+  volume  = {X-1/W1-2023},
+  pages   = {439--445},
+  year    = {2023},
+  doi     = {10.5194/isprs-annals-X-1-W1-2023-439-2023},
+  url     = {https://doi.org/10.5194/isprs-annals-X-1-W1-2023-439-2023}
+}
+```
+
+</details>
