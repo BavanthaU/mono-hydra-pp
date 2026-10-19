@@ -6,7 +6,7 @@
 
 ROS 2 Jazzy · RVIO2–SuperPoint · M2H perception · Hydra mapping
 
-[ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
+[Journal figures](#journal-method-figures) · [ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
 
 </div>
 
@@ -14,6 +14,12 @@ Mono Hydra++ turns monocular RGB and IMU observations into a semantic mesh and
 a layered 3D scene graph. The revised ITC flow uses SuperPoint dense tracking
 inside R-VIO2, learned metric depth and semantics from M2H, and Kimera loop
 proposals consumed by the MIT SPARK Hydra backend.
+
+[![System overview from the revised journal manuscript: RGB and IMU feed SuperPoint-guided RVIO2 and M2H-MX perception, followed by local refinement, temporal alignment, and Hydra scene-graph mapping.](images/system_overview_journal_v14.png)](images/system_overview_journal_v14.png)
+
+*System overview from the revised journal manuscript. Click the figure for full
+resolution. The [ITC guide](ITC_REVISION.md) specifies the active components and
+optional switches for the published launch preset.*
 
 ## First-review ITC update
 
@@ -30,6 +36,9 @@ command, model setup links, optional switches, and validation scope.
 | Robust TSDF integration | Geometric reliability and temporal object association |
 | Raw M2H depth into Hydra | PTC refinement, disabled by default |
 
+<details>
+<summary>ITC runtime flow and optional PTC branch</summary>
+
 ```mermaid
 flowchart LR
     camera[RGB + IMU] --> vio[RVIO2 + SuperPoint]
@@ -44,6 +53,46 @@ flowchart LR
     hydra --> mesh[Semantic mesh]
     hydra --> graph[Objects · Places · Rooms · Building]
 ```
+
+</details>
+
+## Journal method figures
+
+The figures below illustrate temporal alignment, depth-sample selection, and
+local depth-factor geometry in the revised manuscript. The current ITC
+quick-start preset disables temporal alignment and sparse depth factors.
+[Optional PTC refinement](ITC_REVISION.md#switch-ptc-on-or-off) is a separate
+path and remains off by default.
+
+<details>
+<summary><strong>Temporal alignment</strong> — warp, gate, and fuse depth and labels</summary>
+
+[![Temporal alignment: RVIO2 relative poses warp stored depth and labels into the current view; consistency and validity gates select history for fusion.](images/temporal_alignment_journal_v14.png)](images/temporal_alignment_journal_v14.png)
+
+*Historical observations are back-projected, transformed, and reprojected into
+the current image. Accepted history is combined with the current prediction.*
+
+</details>
+
+<details>
+<summary><strong>Depth sampling</strong> — select measurements for local graph refinement</summary>
+
+[![Depth sampling: aligned depth is sampled at tracked keypoints, filtered using validity, motion, reprojection, and semantic criteria, then used as depth factors.](images/depth_sampling_journal_v5.png)](images/depth_sampling_journal_v5.png)
+
+*Candidate depth samples are checked before entering the local graph alongside
+visual, motion, and IMU constraints.*
+
+</details>
+
+<details>
+<summary><strong>Depth-factor geometry</strong> — connect a camera-frame measurement to a landmark</summary>
+
+[![Depth-factor geometry: camera-frame depth along the optical axis and the corresponding pose-landmark factor in a local graph with visual, IMU, and RVIO2 motion constraints.](images/depth_factor_geometry_journal_v3.png)](images/depth_factor_geometry_journal_v3.png)
+
+*The measurement diagram relates the observed pixel and landmark to camera-frame
+depth; the graph shows how that sample connects the current pose and landmark.*
+
+</details>
 
 ## Repository Layout
 
