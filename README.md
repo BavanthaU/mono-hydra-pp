@@ -6,7 +6,7 @@
 
 ROS 2 Jazzy · RVIO2–SuperPoint · M2H perception · Hydra mapping
 
-[Paper](https://arxiv.org/abs/2605.17661) · [Release](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/paper-2026-10-19) · [Journal figures](#journal-method-figures) · [ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
+[Paper](https://arxiv.org/abs/2605.17661) · [Release](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/mono_hydrapp_v1.0) · [Journal figures](#journal-method-figures) · [ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
 
 </div>
 
@@ -27,7 +27,7 @@ The updated code includes RVIO2–SuperPoint tracking, M2H perception, and Hydra
 mapping. The [ITC run guide](ITC_REVISION.md) covers setup, the two-terminal
 workflow, and optional components.
 
-For a fixed version, use [paper-2026-10-19](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/paper-2026-10-19).
+For the ISPRS paper code version, use [mono_hydrapp_v1.0](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/mono_hydrapp_v1.0).
 See [Reproducibility](REPRODUCIBILITY.md) for checkout commands and checksums.
 
 | Main flow | Optional tests and fallbacks |

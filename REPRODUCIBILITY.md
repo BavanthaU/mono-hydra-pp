@@ -1,8 +1,8 @@
 # Fixed code version
 
-**Release:** [paper-2026-10-19](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/paper-2026-10-19)
+**Release:** [mono_hydrapp_v1.0](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/mono_hydrapp_v1.0)
 
-Use this release to retrieve the updated code associated with the journal
+Use this release to retrieve the updated code associated with the ISPRS paper
 submission. Later development continues on `main`; new snapshots receive new
 tags. The release contains the source, configuration, documentation, and journal
 figures. Its Git commit and tree IDs are recorded in `release-manifest.json`
@@ -15,7 +15,7 @@ Create a new workspace and clone the fixed version:
 ```bash
 mkdir -p ~/mono_hydra_paper_ws
 cd ~/mono_hydra_paper_ws
-git clone --branch paper-2026-10-19 --single-branch \
+git clone --branch mono_hydrapp_v1.0 --single-branch \
   https://github.com/BavanthaU/mono-hydra-pp.git src
 git -C src rev-parse HEAD
 ```
@@ -28,8 +28,8 @@ Run their commands from this workspace root.
 For an existing clean clone:
 
 ```bash
-git fetch origin tag paper-2026-10-19
-git switch --detach paper-2026-10-19
+git fetch origin tag mono_hydrapp_v1.0
+git switch --detach mono_hydrapp_v1.0
 ```
 
 ## Downloads and verification
