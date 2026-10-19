@@ -6,12 +6,12 @@
 
 ROS 2 Jazzy · RVIO2–SuperPoint · M2H perception · Hydra mapping
 
-[Journal figures](#journal-method-figures) · [ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
+[Paper](https://arxiv.org/abs/2605.17661) · [Release](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/paper-2026-10-19) · [Journal figures](#journal-method-figures) · [ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
 
 </div>
 
 Mono Hydra++ turns monocular RGB and IMU observations into a semantic mesh and
-a layered 3D scene graph. The revised ITC flow uses SuperPoint dense tracking
+a layered 3D scene graph. The ITC flow uses SuperPoint dense tracking
 inside R-VIO2, learned metric depth and semantics from M2H, and Kimera loop
 proposals consumed by the MIT SPARK Hydra backend.
 
@@ -21,12 +21,14 @@ proposals consumed by the MIT SPARK Hydra backend.
 resolution. The [ITC guide](ITC_REVISION.md) specifies the active components and
 optional switches for the published launch preset.*
 
-## First-review ITC update
+## Updated code
 
-This source update brings the ITC full-loop implementation and its shared
-perception, VIO, and mapping dependencies into the public repository.
-The [ITC revision guide](ITC_REVISION.md) contains the complete two-terminal
-command, model setup links, optional switches, and validation scope.
+The updated code includes RVIO2–SuperPoint tracking, M2H perception, and Hydra
+mapping. The [ITC run guide](ITC_REVISION.md) covers setup, the two-terminal
+workflow, and optional components.
+
+For a fixed version, use [paper-2026-10-19](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/paper-2026-10-19).
+See [Reproducibility](REPRODUCIBILITY.md) for checkout commands and checksums.
 
 | Main flow | Optional tests and fallbacks |
 | --- | --- |
@@ -139,9 +141,11 @@ The perception package publishes learned metric depth and semantic label IDs:
 
 ## Model Weights
 
-Model checkpoints and ONNX exports are not included in the public repository.
-They are ignored by `.gitignore` to keep the journal-submission repository small
-and redistributable.
+Download [M2H-MX checkpoints](https://huggingface.co/Bavantha11/m2h-mx) and
+[ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights) from Hugging Face.
+
+Choose the **ScanNet** or **NYUDv2** weights for your scene and set the matching
+`perception_dataset:=scannet` or `perception_dataset:=nyudv2`.
 
 Place local checkpoints under these paths inside this repository:
 
@@ -166,7 +170,7 @@ src/mono_hydra_vio/scripts/download_orb_vocabulary.sh
 
 ## Build
 
-The revised ITC flow uses RVIO2–SuperPoint. Complete its
+The ITC flow uses RVIO2–SuperPoint. Complete its
 [model and ONNX Runtime setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking)
 before building. For a classical-only build, pass
 `--cmake-args -DMONO_HYDRA_BUILD_RVIO2_SP=OFF` and use

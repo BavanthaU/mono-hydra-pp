@@ -1,7 +1,7 @@
 # ONNX Models
 
-The public Mono Hydra ROS 2 repository intentionally does not include ONNX model
-exports.
+Download [ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights).
+Pinned versions are listed in the [model manifest](../../reproducibility/model-manifest.json).
 
 For local ONNX runs, place the exported models here with the filenames expected
 by the launch defaults:

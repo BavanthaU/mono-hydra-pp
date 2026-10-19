@@ -1,0 +1,92 @@
+{
+  "recorded_on": "2026-10-19",
+  "local_itc_artifacts": [
+    {
+      "path": "mono_hydra_perception/weights/itc_large__miou_0.393_rmse_0.523_weights.pt",
+      "size_bytes": 1334691435,
+      "sha256": "c9d2bcec397ec2829d154aa7f9c3675a18859f2b76dc2b6a1f1ee0e36e0b0ecd"
+    },
+    {
+      "path": "mono_hydra_vio/models/superpoint_480x848.onnx",
+      "size_bytes": 5207677,
+      "sha256": "a5427b3237b8fb3d913dc906b3a584f055ce5530547c911868ee35077ba82aad"
+    },
+    {
+      "path": "mono_hydra_vio/vocabulary/ORBvoc.yml",
+      "size_bytes": 269806393,
+      "sha256": "368532da81f4a628de13b1786ded28eb2a5293d81a53428ef853cd5b3ebd1c36"
+    }
+  ],
+  "hugging_face_repositories": [
+    {
+      "repo_id": "Bavantha11/m2h-mx",
+      "revision": "a3f1cc6b6fd2b136d3c38780344b2fa8af43dc54",
+      "url": "https://huggingface.co/Bavantha11/m2h-mx/tree/a3f1cc6b6fd2b136d3c38780344b2fa8af43dc54",
+      "files": [
+        {
+          "path": "weights/cityscapes/m2h_mx_l_cityscapes_weights.pt",
+          "sha256": "097c6e7ff9abf66cf346de10113835f29e3423b434c1b9120b73b6a92f0c59c3",
+          "size_bytes": 1337905749
+        },
+        {
+          "path": "weights/nyudv2/m2h_mx_b_nyudv2_weights.pt",
+          "sha256": "18439f6693be95b8281a4dfd2c4d1574941a8d10c74b50d972450a262c0cfc9f",
+          "size_bytes": 541754254
+        },
+        {
+          "path": "weights/nyudv2/m2h_mx_l_nyudv2_weights.pt",
+          "sha256": "b2390b484688d0b2d4c84d6819091a7126f96dd036a7121b4bf838da47350219",
+          "size_bytes": 1413437489
+        },
+        {
+          "path": "weights/scannet/m2h_mx_b_scannet_weights.pt",
+          "sha256": "ccde93eaee62241a6f6b34a1c404db4d49ab640c812a21c3d7ebc3cd2e75e6bd",
+          "size_bytes": 455837188
+        },
+        {
+          "path": "weights/scannet/m2h_mx_l_scannet_weights.pt",
+          "sha256": "007e454ea6309ec5c46adb7335ed4b82ed6d902a4ebf117be61be8490af6ee7d",
+          "size_bytes": 1334669099
+        }
+      ]
+    },
+    {
+      "repo_id": "Bavantha11/vio-stack-jetson-weights",
+      "revision": "0de285a1ea8c278d9822537c484c386bea8fee81",
+      "url": "https://huggingface.co/Bavantha11/vio-stack-jetson-weights/tree/0de285a1ea8c278d9822537c484c386bea8fee81",
+      "files": [
+        {
+          "path": "m2h_mx_base_onnx_ros/models/nyudv2/m2h_mx_b_nyudv2_240x320.onnx",
+          "sha256": "f42c8f29beee5c196cd34dedf869f740741031a2032fad977199012fd9822988",
+          "size_bytes": 518757312
+        },
+        {
+          "path": "m2h_mx_base_onnx_ros/models/nyudv2/m2h_mx_b_nyudv2_480x640.onnx",
+          "sha256": "c9cacf6e6c64a85a9366a91050ffb55b6396f7428ce13d20dc396abf3ac3871e",
+          "size_bytes": 520445301
+        },
+        {
+          "path": "m2h_mx_base_onnx_ros/models/scannet/m2h_mx_b_scannet_240x320.onnx",
+          "sha256": "36724c1c9966b2abee20a9ad376cb73a2a0a4c263cada249407d4c532d3d525b",
+          "size_bytes": 441723986
+        },
+        {
+          "path": "m2h_mx_base_onnx_ros/models/scannet/m2h_mx_b_scannet_480x640.onnx",
+          "sha256": "97dd8c97ecca004213be806eeb9616223c933109e6e8f59038a04a4c4fcfa0ac",
+          "size_bytes": 443411975
+        },
+        {
+          "path": "m2h_mx_large_onnx/onnx_models/scannet_depth_sem_192x256_trt_clean.onnx",
+          "sha256": "2875ac5cc9c4087c860244022c0b39e1211c5efeb7624d37cd89219e6ca305aa",
+          "size_bytes": 1323341108
+        },
+        {
+          "path": "m2h_mx_large_onnx/onnx_models/scannet_depth_sem_320x416.onnx",
+          "sha256": "8262d5cc5ca98db21ddbe8f3b2407ec97f5d418a4c6b173d267ddb76e334237d",
+          "size_bytes": 1320032597
+        }
+      ]
+    }
+  ],
+  "note": "The local ITC checkpoint and SuperPoint export do not match any file listed in these Hugging Face snapshots. Obtain the matching files separately to reproduce the default ITC setup."
+}

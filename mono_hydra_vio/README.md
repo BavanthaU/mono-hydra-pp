@@ -112,7 +112,7 @@ overridden per launch (`-1` / empty keeps the file value):
 inside `rvio2_sp_mono_node`, which is useful for A/B runs with identical
 statistics logging.
 
-The SuperPoint target is enabled by default for the revised ITC flow.
+The SuperPoint target is enabled by default for the ITC flow.
 Export the ITC model from separately obtained SuperPoint v1 weights, from the
 workspace root:
 

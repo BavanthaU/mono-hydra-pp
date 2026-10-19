@@ -1,8 +1,6 @@
-# ITC first-review source update
+# ITC setup and optional components
 
-This source snapshot synchronizes the local ITC full-loop implementation for
-the first journal review cycle. It includes source changes and regression
-checks; it does not replace the submitted manuscript or its result tables.
+Run the updated code with the following setup and component switches.
 
 ## Scope
 
@@ -31,7 +29,7 @@ locally before building. From the workspace root, start terminal 1:
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  sequence_name:=itc_revision_$(date +%Y%m%d_%H%M%S) \
+  sequence_name:=itc_$(date +%Y%m%d_%H%M%S) \
   rvio2_variant:=superpoint rvio2_sp_tracker_method:=2 rvio2_sp_detector:=1 \
   perception_backend:=torch perception_dataset:=itc \
   perception_skip_frequency:=3 perception_target_fps:=0.0 \
@@ -57,8 +55,12 @@ processing to drain, press Ctrl-C once in terminal 1, and wait for clean export.
 
 The explicit `torch` argument selects M2H-HMX. Omitting it uses the older M2H
 launch default. Place checkpoints locally as described in the main README.
-Model weights, ONNX exports, runtime libraries, bags, private commands, and
-generated experiment outputs are not included in this source update.
+Model downloads: [M2H-MX checkpoints](https://huggingface.co/Bavantha11/m2h-mx)
+and [ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights).
+Choose ScanNet or NYUDv2 weights for your scene. In the command above, replace
+`perception_dataset:=itc` with `perception_dataset:=scannet` or
+`perception_dataset:=nyudv2`, and set
+`perception_checkpoint_path:=/path/to/the/matching_weights.pt`.
 
 ## Optional components
 
@@ -109,16 +111,16 @@ launch with `rvio2_variant:=classical`. MAViSTA has a separate
 
 ## Validation scope
 
-Publication checks on 2026-10-19 passed:
+Checks on 2026-10-19 passed:
 
 - 17 Python tests covering perception scheduling, label mapping, native PTC
   adapters, and MAViSTA geometry.
 - 19 rebuilt Hydra tests covering robust fusion, geometric reliability, mesh
   clustering, and object association.
 - Builds of the RVIO2–SuperPoint and Kimera nodes in the existing workspace;
-  launch/perception/MAViSTA package builds from the publication checkout.
+  launch/perception/MAViSTA package builds from the release checkout.
 - 12 launch combinations covering the default, SuperPoint, and classical
   frontend selections with PTC and revision switches on/off; source syntax
   and whitespace checks.
 These are implementation checks; no complete ITC replay or manuscript metric
-reproduction is implied by this publication update.
+reproduction is implied by this code update.

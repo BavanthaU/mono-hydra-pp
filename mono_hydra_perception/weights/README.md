@@ -1,7 +1,10 @@
 # Model Weights
 
-The public Mono Hydra ROS 2 repository intentionally does not include trained
-M2H-HMX-Large checkpoints.
+Download [M2H-MX checkpoints](https://huggingface.co/Bavantha11/m2h-mx).
+Choose the ScanNet or NYUDv2 weights for your scene and use the matching
+`perception_dataset:=scannet` or `perception_dataset:=nyudv2`.
+See the [model manifest](../../reproducibility/model-manifest.json) for pinned
+versions and the local ITC checkpoint hash.
 
 For local runs, place the checkpoints here with the filenames expected by the
 launch defaults:
@@ -16,5 +19,5 @@ Alternatively, pass an explicit checkpoint at launch:
 
 ```bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  perception_checkpoint_path:=/path/to/model.pt
+  perception_backend:=torch perception_checkpoint_path:=/path/to/model.pt
 ```
