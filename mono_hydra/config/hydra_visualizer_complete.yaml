@@ -50,8 +50,8 @@ renderer:
         alpha: 0.35
         use_color: false
         interlayer_use_source: true
-        interlayer_scale: 0.1
-        interlayer_alpha: 0.5
+        interlayer_scale: 0.16
+        interlayer_alpha: 0.95
         interlayer_use_color: true
         interlayer_insertion_skip: 0
   partitions:

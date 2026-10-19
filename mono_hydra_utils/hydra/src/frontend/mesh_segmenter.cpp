@@ -47,6 +47,7 @@
 
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
+#include "hydra/input/camera.h"
 
 namespace hydra {
 
@@ -67,6 +68,18 @@ void declare_config(MeshSegmenter::Config& config) {
               {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
   field(config.timer_namespace, "timer_namespace");
   field(config.sinks, "sinks");
+  field(config.use_temporal_overlap, "use_temporal_overlap");
+  field(config.association_max_gap_m, "association_max_gap_m");
+  field(config.association_depth_tolerance_m, "association_depth_tolerance_m");
+  field(config.association_min_overlap, "association_min_overlap");
+  field(config.association_max_age_s, "association_max_age_s");
+  field(config.association_confirmations, "association_confirmations");
+  check(config.association_max_gap_m, GT, 0.0, "association_max_gap_m");
+  check(config.association_depth_tolerance_m, GT, 0.0, "association_depth_tolerance_m");
+  check(config.association_min_overlap, GT, 0.0, "association_min_overlap");
+  check(config.association_min_overlap, LE, 1.0, "association_min_overlap");
+  check(config.association_max_age_s, GT, 0.0, "association_max_age_s");
+  check(config.association_confirmations, GE, 2, "association_confirmations");
 }
 
 template <typename LList, typename RList>
@@ -182,6 +195,9 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
         continue;
       }
 
+      // TSDF updates move surviving vertices even when their IDs are unchanged.
+      // Association below must use the remapped geometry, especially for thin objects.
+      updateObjectGeometry(*graph.mesh(), attrs);
       attrs.is_active = !stats.all_archived;
       if (!attrs.is_active) {
         iter = label_nodes.erase(iter);
@@ -200,13 +216,14 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
 void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
                                 const kimera_pgmo::MeshOffsetInfo& offsets,
                                 const LabelClusters& clusters,
-                                DynamicSceneGraph& graph) {
+                                DynamicSceneGraph& graph,
+                                const InputData* observation) {
   ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
-  updateOldNodes(offsets, graph);
   if (!graph.hasMesh()) {
     LOG(ERROR) << "Unable to update graph without mesh!";
     return;
   }
+  updateOldNodes(offsets, graph);
 
   for (auto&& [label, clusters_for_label] : clusters) {
     for (const auto& cluster : clusters_for_label) {
@@ -214,7 +231,19 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
       std::vector<NodeId> nodes_not_in_graph;
       for (const auto& prev_node_id : active_nodes_.at(label)) {
         const auto& prev_node = graph.getNode(prev_node_id);
-        if (nodesMatch(cluster, prev_node)) {
+        bool matches = nodesMatch(cluster, prev_node);
+        if (config.use_temporal_overlap) {
+          // Tracked mesh vertices are direct identity evidence. Geometric-only
+          // associations below require repeated, visible projected support.
+          const auto& connections = prev_node.attributes<ObjectNodeAttributes>().mesh_connections;
+          const std::unordered_set<size_t> previous(connections.begin(), connections.end());
+          size_t shared = 0;
+          for (const auto index : cluster.indices) {
+            shared += previous.count(index);
+          }
+          matches = shared > 0 && shared >= 0.5 * std::min(previous.size(), cluster.indices.size());
+        }
+        if (matches) {
           updateNodeInGraph(graph, cluster, prev_node, timestamp_ns);
           matches_prev_node = true;
           break;
@@ -225,7 +254,138 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
         addNodeToGraph(graph, cluster, label, timestamp_ns);
       }
 
-      mergeActiveNodes(graph, label);
+      if (!config.use_temporal_overlap) {
+        mergeActiveNodes(graph, label);
+      }
+    }
+  }
+  if (config.use_temporal_overlap && observation) {
+    mergeTemporalNodes(graph, timestamp_ns, *observation);
+  }
+}
+
+void MeshSegmenter::mergeTemporalNodes(DynamicSceneGraph& graph,
+                                        uint64_t timestamp,
+                                        const InputData& observation) {
+  if (timestamp <= last_association_stamp_) {
+    association_evidence_.clear();
+    last_association_stamp_ = timestamp;
+    return;
+  }
+  last_association_stamp_ = timestamp;
+  const auto* camera = dynamic_cast<const Camera*>(&observation.getSensor());
+  if (!camera || observation.depth_image.type() != CV_32FC1 ||
+      !observation.getSensorPose().matrix().allFinite()) {
+    association_evidence_.clear();
+    return;
+  }
+  const auto camera_T_world = observation.getSensorPose().inverse().cast<float>();
+  const int width = observation.depth_image.cols, height = observation.depth_image.rows;
+  const int columns = (width + 7) / 8;
+  std::map<NodeId, std::set<int>> footprints;
+  for (const auto& [label, ids] : active_nodes_) {
+    for (const auto id : ids) {
+      const auto& attrs = graph.getNode(id).attributes<ObjectNodeAttributes>();
+      if (timestamp < attrs.last_update_time_ns ||
+          (timestamp - attrs.last_update_time_ns) * 1.0e-9 > config.association_max_age_s) {
+        continue;
+      }
+      auto& footprint = footprints[id];
+      // Bound projection work per object; ordering is stable between updates.
+      const size_t stride = std::max<size_t>(1, (attrs.mesh_connections.size() + 511) / 512);
+      size_t i = 0;
+      for (const auto index : attrs.mesh_connections) {
+        if (i++ % stride || index >= graph.mesh()->numVertices()) {
+          continue;
+        }
+        const Eigen::Vector3f p = camera_T_world * graph.mesh()->pos(index);
+        int u, v;
+        if (!p.allFinite() || p.z() <= 0 || !camera->projectPointToImagePlane(p, u, v) ||
+            u < 0 || v < 0 || u >= width || v >= height) {
+          continue;
+        }
+        const float z = observation.depth_image.at<float>(v, u);
+        if (!std::isfinite(z) || z <= 0 ||
+            std::abs(z - p.z()) > config.association_depth_tolerance_m) {
+          continue;
+        }
+        // A small splat tolerates pixel discretization, without a full-image mask.
+        for (int dv = -1; dv <= 1; ++dv) {
+          for (int du = -1; du <= 1; ++du) {
+            const int x = u / 8 + du, y = v / 8 + dv;
+            if (x >= 0 && y >= 0 && x < columns && y < (height + 7) / 8) {
+              footprint.insert(y * columns + x);
+            }
+          }
+        }
+      }
+    }
+  }
+  std::map<std::pair<NodeId, NodeId>, Evidence> next;
+  std::map<NodeId, size_t> candidate_count;
+  for (const auto& [label, ids] : active_nodes_) {
+    for (auto a = ids.begin(); a != ids.end(); ++a) {
+      for (auto b = std::next(a); b != ids.end(); ++b) {
+        const auto& x = footprints[*a];
+        const auto& y = footprints[*b];
+        if (x.size() < 6 || y.size() < 6) {
+          continue;
+        }
+        const auto& lhs = graph.getNode(*a).attributes<ObjectNodeAttributes>().bounding_box;
+        const auto& rhs = graph.getNode(*b).attributes<ObjectNodeAttributes>().bounding_box;
+        // World AABBs from actual corners also support rotated bounding boxes.
+        auto bounds = [](const BoundingBox& box) {
+          Eigen::Vector3f lo = Eigen::Vector3f::Constant(std::numeric_limits<float>::infinity());
+          Eigen::Vector3f hi = -lo;
+          for (const auto& corner : box.corners()) {
+            lo = lo.cwiseMin(corner); hi = hi.cwiseMax(corner);
+          }
+          return std::make_pair(lo, hi);
+        };
+        const auto l = bounds(lhs), r = bounds(rhs);
+        const float gap = (l.first.cwiseMax(r.first) - l.second.cwiseMin(r.second))
+                              .cwiseMax(0.0f).norm();
+        if (gap > config.association_max_gap_m) {
+          continue;
+        }
+        size_t overlap = 0;
+        for (const int pixel : x) { overlap += y.count(pixel); }
+        if (double(overlap) / std::min(x.size(), y.size()) < config.association_min_overlap) {
+          continue;
+        }
+        const auto key = std::make_pair(*a, *b);
+        Evidence evidence;
+        const auto old = association_evidence_.find(key);
+        if (old != association_evidence_.end() && timestamp > old->second.stamp &&
+            (timestamp - old->second.stamp) * 1.0e-9 <= config.association_max_age_s) {
+          evidence.count = old->second.count;
+        }
+        evidence.stamp = timestamp;
+        ++evidence.count;
+        next[key] = evidence;
+        ++candidate_count[*a]; ++candidate_count[*b];
+      }
+    }
+  }
+  for (const auto& [pair, evidence] : next) {
+    if (evidence.count < config.association_confirmations ||
+        candidate_count[pair.first] != 1 || candidate_count[pair.second] != 1) {
+      continue;
+    }
+    auto& lhs = graph.getNode(pair.first).attributes<ObjectNodeAttributes>();
+    const auto& rhs = graph.getNode(pair.second).attributes<ObjectNodeAttributes>();
+    mergeList(lhs.mesh_connections, rhs.mesh_connections);
+    lhs.last_update_time_ns = std::max(lhs.last_update_time_ns, rhs.last_update_time_ns);
+    active_nodes_.at(lhs.semantic_label).erase(pair.second);
+    graph.removeNode(pair.second);
+    updateObjectGeometry(*graph.mesh(), lhs);
+    VLOG(2) << "TemporalObjectMerge stamp=" << timestamp << " keep=" << pair.first
+            << " remove=" << pair.second << " confirmations=" << evidence.count;
+  }
+  association_evidence_.clear();
+  for (const auto& [pair, evidence] : next) {
+    if (graph.hasNode(pair.first) && graph.hasNode(pair.second)) {
+      association_evidence_.insert({pair, evidence});
     }
   }
 }

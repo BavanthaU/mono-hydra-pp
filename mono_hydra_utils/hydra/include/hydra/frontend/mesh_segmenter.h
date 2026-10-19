@@ -36,6 +36,7 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
+#include "hydra/input/input_data.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -50,7 +51,7 @@ using clustering::LabelIndices;
 class MeshSegmenter {
  public:
   struct Cluster {
-    Eigen::Vector3d centroid;
+    Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
     std::vector<size_t> indices;
   };
 
@@ -66,6 +67,12 @@ class MeshSegmenter {
     BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
     std::string timer_namespace = "frontend/objects";
     std::vector<Sink::Factory> sinks;
+    bool use_temporal_overlap = false;
+    double association_max_gap_m = 0.2;
+    double association_depth_tolerance_m = 0.2;
+    double association_min_overlap = 0.6;
+    double association_max_age_s = 2.0;
+    int association_confirmations = 3;
   } const config;
 
   explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
@@ -77,7 +84,8 @@ class MeshSegmenter {
   void updateGraph(uint64_t timestamp,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
                    const LabelClusters& clusters,
-                   DynamicSceneGraph& graph);
+                   DynamicSceneGraph& graph,
+                   const InputData* observation = nullptr);
 
   std::unordered_set<NodeId> getActiveNodes() const;
 
@@ -96,12 +104,21 @@ class MeshSegmenter {
                          uint64_t timestamp);
 
   void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
+  void mergeTemporalNodes(DynamicSceneGraph& graph,
+                          uint64_t timestamp,
+                          const InputData& observation);
 
  private:
   NodeSymbol next_node_id_;
   std::set<uint32_t> labels_;
   std::map<uint32_t, std::set<NodeId>> active_nodes_;
   Sink::List sinks_;
+  struct Evidence {
+    uint64_t stamp = 0;
+    int count = 0;
+  };
+  std::map<std::pair<NodeId, NodeId>, Evidence> association_evidence_;
+  uint64_t last_association_stamp_ = 0;
 };
 
 void declare_config(MeshSegmenter::Config& config);

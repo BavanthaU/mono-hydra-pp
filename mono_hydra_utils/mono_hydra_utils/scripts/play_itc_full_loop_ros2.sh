@@ -2,16 +2,19 @@
 set -euo pipefail
 
 BAG_PATH="test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2"
+START_PAUSED=1
 
 usage() {
   cat <<'USAGE'
-Usage: play_itc_full_loop_ros2.sh [BAG_PATH]
+Usage: play_itc_full_loop_ros2.sh [--start-paused|--no-start-paused] [BAG_PATH]
 
 Plays the converted ITC full-loop ROS 2 bag with the TF remaps required by
-Mono Hydra. By default, playback runs at rosbag's normal real-time rate.
+Mono Hydra. By default, playback starts paused so the perception, RVIO2,
+Kimera, and Hydra nodes can initialize before the first frames are released.
 
 Examples:
   play_itc_full_loop_ros2.sh
+  play_itc_full_loop_ros2.sh --no-start-paused
   play_itc_full_loop_ros2.sh test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2
 USAGE
 }
@@ -21,6 +24,14 @@ while (($#)); do
     -h|--help)
       usage
       exit 0
+      ;;
+    --start-paused)
+      START_PAUSED=1
+      shift
+      ;;
+    --no-start-paused)
+      START_PAUSED=0
+      shift
       ;;
     *)
       BAG_PATH="$1"
@@ -34,6 +45,10 @@ QOS_OVERRIDES="$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config
 PLAY_ARGS=(ros2 bag play "${BAG_PATH}" \
   --clock \
 )
+
+if [[ "${START_PAUSED}" == "1" ]]; then
+  PLAY_ARGS+=(--start-paused)
+fi
 
 PLAY_ARGS+=(\
   --qos-profile-overrides-path "${QOS_OVERRIDES}" \

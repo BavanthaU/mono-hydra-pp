@@ -87,9 +87,8 @@ class ProjectiveIntegrator {
     //! Distance in meters where the weight drop-off reaches zero. Negative
     //! values are multiples of the voxel size
     float weight_dropoff_epsilon = -1.0f;
-    //! If true, use unitary (w=1) weights to update the TSDF. Otherwise use
-    //! weights as a function of the squared depth to approximate typical RGBD
-    //! sensor confidence
+    //! If true, omit the extra inverse-squared-depth noise factor. Sensor ray
+    //! density still applies (for cameras, weights already decay as 1 / depth^2).
     bool use_constant_weight = false;
     //! Force measurements to carry at least a minimum weight for integration
     //! (corresponds to minimum weight required for a voxel to be observed in the mesh
@@ -98,6 +97,13 @@ class ProjectiveIntegrator {
     //! Maximum weight used for TSDF updates. High max weight keeps information
     //! longer in memory, low max weight favors rapid updates
     float max_weight = 1.0e5f;
+    //! Robustify innovations against observed, unsaturated TSDF surfaces.
+    bool use_robust_weight = false;
+    //! Cauchy residual scale = absolute term + relative term * measured range.
+    float robust_weight_scale_m = 0.05f;
+    float robust_weight_scale_relative = 0.03f;
+    //! Positive lower bound allows persistent new geometry to replace old geometry.
+    float robust_weight_min_factor = 0.05f;
     //! Number of threads used to perform integration (parallelized by block)
     int num_threads = GlobalInfo::instance().getConfig().default_num_threads;
     //! Which interpolation to use in the image projection [nearest, bilinear,
@@ -114,6 +120,7 @@ class ProjectiveIntegrator {
     bool within_extra_integration_distance = false;
     float sdf = 0.0f;
     float weight = 0.0f;
+    float range = 0.0f;  // interpolated measured ray length, before SDF truncation
     int32_t label = -1;
   };
 
@@ -206,6 +213,11 @@ class ProjectiveIntegrator {
                       const Sensor& sensor,
                       const Point& p_C,
                       const float sdf) const;
+
+  //! Apply bounded surface-consistency influence to the existing sensor weight.
+  float computeRobustWeight(const VolumetricMap::Config& map_config,
+                            const VoxelMeasurement& measurement,
+                            const TsdfVoxel& voxel) const;
 
   // TODO(lschmid): Find a good way to clean this up and integrate this more nicely.
   // Just adding hooks here for now for Khronos updates.

@@ -52,6 +52,10 @@ venv/
 !mono_hydra_perception/weights/README.md
 !mono_hydra_perception/onnx_models/README.md
 
+# Local standalone student copy of mono_hydra_perception, including large ONNX models.
+m2h_mx_large_onnx/
+mono_hydra_perception/m2h_mx_onnx_package/
+
 # Large binary dependencies generated or unpacked locally
 *.so
 *.so.*

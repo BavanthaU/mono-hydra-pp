@@ -67,7 +67,7 @@ DsgUpdater::DsgUpdater(const Config& config,
                        SharedDsgInfo::Ptr target)
     : config(config::checkValid(config)), source_graph_(source), target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
-    update_functors_.emplace(name, functor.create());
+    update_functors_.emplace_back(name, functor.create());
   }
 }
 

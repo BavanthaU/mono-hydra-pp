@@ -85,7 +85,9 @@ Clusters findClusters(const ClusteringConfig& config,
     p.z = pos.z();
   }
 
-  pcl::search::KdTree<PointXYZ>::Ptr tree(new pcl::search::KdTree<PointXYZ>());
+  // Euclidean clustering needs radius membership, not distance ordering. Avoid
+  // sorting every dense mesh neighborhood; PCL handles unsorted self-neighbors.
+  pcl::search::KdTree<PointXYZ>::Ptr tree(new pcl::search::KdTree<PointXYZ>(false));
   tree->setInputCloud(cloud);
 
   pcl::EuclideanClusterExtraction<PointXYZ> estimator;

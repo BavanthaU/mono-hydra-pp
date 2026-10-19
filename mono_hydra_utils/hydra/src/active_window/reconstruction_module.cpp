@@ -85,6 +85,7 @@ void declare_config(ReconstructionModule::Config& config) {
   field(config.full_update_separation_s, "full_update_separation_s", "s");
   field(config.max_input_queue_size, "max_input_queue_size");
   field(config.tsdf, "tsdf");
+  field(config.geometric_reliability, "geometric_reliability");
   field(config.mesh, "mesh");
   config.robot_footprint.setOptional();
   field(config.robot_footprint, "robot_footprint");
@@ -95,6 +96,7 @@ ReconstructionModule::ReconstructionModule(const Config& config,
     : ActiveWindowModule(config, queue),
       config(config::checkValid(config)),
       last_update_ns_(std::nullopt),
+      geometric_reliability_(config.geometric_reliability),
       tsdf_integrator_(std::make_unique<ProjectiveIntegrator>(config.tsdf)),
       mesh_integrator_(std::make_unique<MeshIntegrator>(config.mesh)),
       footprint_integrator_(config.robot_footprint.create()) {
@@ -155,6 +157,11 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
 
   cv::Mat integration_mask;
   maskInvalidSemantics(data->label_image, invalid_labels, integration_mask);
+
+  if (config.geometric_reliability.enabled) {
+    ScopedTimer timer("reconstruction/geometric_reliability", timestamp_ns);
+    data->geometric_reliability = geometric_reliability_.compute(*data);
+  }
 
   {  // timing scope
     ScopedTimer timer("reconstruction/tsdf", timestamp_ns);

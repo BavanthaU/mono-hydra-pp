@@ -84,6 +84,7 @@ void declare_config(UpdateObjectsFunctor::Config& config) {
   name("UpdateObjectsFunctor::Config");
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
+  field(config.require_mesh_overlap, "require_mesh_overlap");
 }
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
@@ -163,11 +164,22 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
   merge_proposer.findMerges(
       objects,
       view,
-      [](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
+      [this](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
         const auto lhs_attrs = lhs.tryAttributes<ObjectNodeAttributes>();
         const auto rhs_attrs = rhs.tryAttributes<ObjectNodeAttributes>();
         if (!lhs_attrs || !rhs_attrs) {
           return false;
+        }
+
+        if (config.require_mesh_overlap) {
+          const std::set<size_t> indices(lhs_attrs->mesh_connections.begin(),
+                                          lhs_attrs->mesh_connections.end());
+          size_t shared = 0;
+          for (const auto index : rhs_attrs->mesh_connections) {
+            shared += indices.count(index);
+          }
+          return shared > 0 && shared >= 0.5 * std::min(
+              indices.size(), rhs_attrs->mesh_connections.size());
         }
 
         return lhs_attrs->bounding_box.contains(rhs_attrs->position) ||

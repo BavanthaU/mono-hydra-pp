@@ -96,6 +96,10 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.use_constant_weight, "use_constant_weight");
   field(config.min_measurement_weight, "min_measurement_weight");
   field(config.max_weight, "max_weight");
+  field(config.use_robust_weight, "use_robust_weight");
+  field(config.robust_weight_scale_m, "robust_weight_scale_m");
+  field(config.robust_weight_scale_relative, "robust_weight_scale_relative");
+  field(config.robust_weight_min_factor, "robust_weight_min_factor");
   field<ThreadNumConversion>(config.num_threads, "num_threads");
   field(config.interpolation_method, "interpolation_method");
   config.semantic_integrator.setOptional();
@@ -108,6 +112,10 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   check(config.num_threads, GT, 0, "num_threads");
   check(config.min_measurement_weight, GE, 0.0f, "min_measurement_weight");
   check(config.max_weight, GT, 0, "max_weight");
+  check(config.robust_weight_scale_m, GT, 0.0f, "robust_weight_scale_m");
+  check(config.robust_weight_scale_relative, GE, 0.0f, "robust_weight_scale_relative");
+  check(config.robust_weight_min_factor, GT, 0.0f, "robust_weight_min_factor");
+  check(config.robust_weight_min_factor, LE, 1.0f, "robust_weight_min_factor");
   if (config.use_weight_dropoff) {
     check(config.weight_dropoff_epsilon, NE, 0.0f, "weight_dropoff_epsilon");
   }
@@ -253,6 +261,16 @@ Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_confi
   // Compute the weight of the measurement
   measurement.weight =
       computeWeight(map_config, data.getSensor(), p_C, measurement.sdf);
+  if (!data.geometric_reliability.empty()) {
+    CHECK_EQ(data.geometric_reliability.type(), CV_32FC1);
+    CHECK(data.geometric_reliability.size() == data.range_image.size());
+    const float factor = interpolator_->interpolateRange(
+        data.geometric_reliability, measurement.interpolation_weights);
+    // Apply after the sensor-weight floor, including free-space updates.
+    if (std::isfinite(factor)) {
+      measurement.weight *= std::clamp(factor, 0.0f, 1.0f);
+    }
+  }
   measurement.valid = true;
   return measurement;
 }
@@ -269,13 +287,18 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
   // Cache old weight and add measurement to the current weight
   auto& tsdf_voxel = *voxels.tsdf;
   const auto prev_weight = tsdf_voxel.weight;
+  const auto weight = computeRobustWeight(map_config, measurement, tsdf_voxel);
+  // In particular, a zero drop-off weight must not initialize a voxel with 0/0.
+  if (!std::isfinite(weight) || weight <= 0.0f) {
+    return;
+  }
   tsdf_voxel.weight =
-      std::min(tsdf_voxel.weight + measurement.weight, config.max_weight);
+      std::min(prev_weight + weight, config.max_weight);
 
   // Update TSDF distance using weighted averaging fusion
   tsdf_voxel.distance =
-      (tsdf_voxel.distance * prev_weight + measurement.sdf * measurement.weight) /
-      (prev_weight + measurement.weight);
+      (tsdf_voxel.distance * prev_weight + measurement.sdf * weight) /
+      (prev_weight + weight);
 
   if (voxels.tracking) {
     // this condition should always trigger when the voxel has no integrated
@@ -295,13 +318,13 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
   if (!data.color_image.empty()) {
     const auto color = interpolator_->interpolateColor(
         data.color_image, measurement.interpolation_weights);
-    const float ratio = measurement.weight / (tsdf_voxel.weight + measurement.weight);
+    const float ratio = weight / (tsdf_voxel.weight + weight);
     tsdf_voxel.color.merge(color, ratio);
   }
 
   if (semantic_integrator_ && voxels.semantic) {
     semantic_integrator_->updateLikelihoods(
-        measurement.label, measurement.weight, *voxels.semantic);
+        measurement.label, weight, *voxels.semantic);
   }
 }
 
@@ -326,6 +349,7 @@ void ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
                                       VoxelMeasurement& measurement) const {
   const auto d_to_surface = interpolator_->interpolateRange(
       data.range_image, measurement.interpolation_weights);
+  measurement.range = d_to_surface;
   const auto sdf = d_to_surface - distance_to_voxel;
   if (config.extra_integration_distance) {
     // distance threshold past the truncation band
@@ -379,6 +403,29 @@ float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
   // nonnegative)
   weight = std::max(weight, config.min_measurement_weight);
   return weight;
+}
+
+float ProjectiveIntegrator::computeRobustWeight(const MapConfig& map_config,
+                                                const Measurement& measurement,
+                                                const TsdfVoxel& voxel) const {
+  // Saturated TSDF values encode only a distance bound, not a surface residual.
+  // Do not let unknown space or old free space prevent discovery of new surfaces.
+  // Averaging saturated observations can round slightly inside the band.
+  const float surface_limit = map_config.truncation_distance * (1.0f - 1.0e-5f);
+  if (!config.use_robust_weight || voxel.weight <= 0.0f ||
+      std::abs(voxel.distance) >= surface_limit ||
+      !std::isfinite(measurement.range) || measurement.range <= 0.0f) {
+    return measurement.weight;
+  }
+
+  const float scale = config.robust_weight_scale_m +
+                      config.robust_weight_scale_relative * measurement.range;
+  const float residual = (measurement.sdf - voxel.distance) / scale;
+  const float factor = std::max(config.robust_weight_min_factor,
+                                1.0f / (1.0f + residual * residual));
+  // Apply after the sensor-weight floor so it cannot undo the robust loss.
+  // The positive floor bounds influence without permanently locking the first view.
+  return measurement.weight * factor;
 }
 
 bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,

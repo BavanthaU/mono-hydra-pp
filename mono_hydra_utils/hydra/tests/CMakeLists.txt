@@ -24,6 +24,7 @@ add_executable(
   input/test_sensor.cpp
   input/test_sensor_utilities.cpp
   frontend/test_mesh_segmenter.cpp
+  frontend/test_mesh_delta_clustering.cpp
   frontend/test_graph_connector.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
@@ -39,6 +40,8 @@ add_executable(
   reconstruction/test_integration_masking.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_projection_interpolators.cpp
+  reconstruction/test_projective_integrator.cpp
+  reconstruction/test_geometric_reliability.cpp
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_tsdf_interpolators.cpp
   reconstruction/test_volumetric_map.cpp

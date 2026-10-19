@@ -65,7 +65,7 @@ ScanNet_depth_factors_on
 ## Build
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source /opt/ros/jazzy/setup.bash
 MAKEFLAGS="-j2" colcon build --symlink-install --continue-on-error \
   --parallel-workers 2
@@ -75,13 +75,16 @@ source install/setup.bash
 ## ITC ROS 1 Bag Conversion
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 src/mono_hydra_utils/mono_hydra_utils/scripts/convert_itc_ros1_bag_to_ros2.sh \
-  /home/bavantha/ros1_workspaces/hydra2_ws/data/itc/ITC_2nd_floor_full_loop.bag
+  $HOME/ros1_workspaces/hydra2_ws/data/itc/ITC_2nd_floor_full_loop.bag
 ```
 
 ## ITC Run
+
+See [ITC_REVISION.md](ITC_REVISION.md) for the current two-terminal command
+and optional revision switches.
 
 By default, ITC uses the original ROS 1 M2H model path:
 
@@ -116,14 +119,49 @@ creates `/external_odometry` and `/mono_hydra_vio/odometry`; Kimera publishes
 publishes `base_link_kimera -> left_cam_kimera`. The static `map -> odom`
 helper is disabled for ITC so it cannot mask the LCD correction.
 
-The ITC ROS 2 defaults preserve dense ROS 1 parity: M2H reports output lag but
-does not drop already-processed RGB-D/semantic frames, Hydra's RGB-D receiver
-queue and Kimera sync queues are large enough to avoid starving mesh
-integration, and RViz uses the native `kimera_pgmo_rviz/MeshDisplay` plugin on
-Hydra's optimized backend mesh. The compiled mesh-marker bridge remains
-available only as an explicit fallback, not as part of the default ITC
-production run. Use a positive `perception_max_output_lag_s` only for
-low-latency debug views where incomplete/sparser mesh output is acceptable.
+The ITC HMX path resizes the complete 848x480 camera image to the checkpoint's
+native 512x384 inference size and restores depth/labels across the complete
+camera canvas, matching the ROS 1 wrapper. Camera queues keep only the
+two newest messages and frames more than one second behind `/clock` are dropped,
+so an overloaded GPU produces a temporarily sparser map instead of an
+ever-growing stale backlog.
+
+Temporal depth/label fusion is disabled for ITC. Each HMX callback publishes the
+predicted depth, semantic labels, synchronized RGB, and synchronized CameraInfo
+with the same source timestamp. That current-frame depth topic is consumed
+directly by both Kimera RGB-D and Hydra TSDF integration. RVIO2 odometry is passed
+through without any scene-specific planar or height constraint.
+
+The HMX ITC model produces depth over its configured 0.1--20 m interval and
+Kimera accepts depth up to 10 m. Hydra integrates a conservative 0.1--8 m range.
+Its spatial map window is 10 m so far-range TSDF blocks remain inside the active
+window, and its 0.45 m truncation band spans nine 0.05 m voxels.
+
+Depth factors are also disabled: `use_sparse_depth_factors: false` in
+`BackendParams.yaml`, `rgbd_use_dense_depth_factors: 0` in `FrontendParams.yaml`,
+and `use_sparse_depth_factors:=false` in the ITC launch. Kimera still receives
+the HMX depth image as its RGB-D measurement, matching the ROS 1 architecture;
+the depth is not converted into additional backend optimization factors.
+
+The ITC stack does not exit automatically when bag `/clock` stops. Wait for
+RVIO2/Kimera to drain their final inputs and for LCD output to appear, then stop
+the launch with Ctrl-C. This matches the ROS 1 terminal workflow and prevents
+the return-to-start segment from being discarded during shutdown.
+
+ITC also preserves the ROS 1 loop-closure split: Kimera visual LCD is enabled
+with `lcd_no_optimize`, and Hydra PGMO consumes Kimera's loop edges and keeps
+`optimize_on_lc: true`. Hydra's independent semantic DSG LCD is disabled for
+this launch by default. Enabling both detectors caused dozens of repetitive
+corridor closures and repeated mesh deformation; it remains available for an
+explicit ablation with `enable_hydra_lcd:=true`.
+
+With `perception_backend:=torch perception_dataset:=itc`, HMX loads
+`m2h_hmx_v3_1_large_itc_mt_hr.yml` and
+`itc_large__miou_0.393_rmse_0.523_weights.pt`. ScanNet weights are selected only
+with `perception_dataset:=scannet`; NYUv2 weights are selected with
+`perception_dataset:=nyud` (the `nyudv2` alias is also accepted). The ITC launch
+explicitly selects `itc`, so it does not use either ScanNet or NYUv2 weights
+unless `perception_dataset` or an explicit checkpoint path is overridden.
 
 ### ROS 1-Style Four-Terminal Manual Run
 
@@ -136,7 +174,7 @@ each terminal only exposes the knobs that belong to that component.
 Terminal 1: Hydra + RViz
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_hydra.launch.py \
   sequence_name:=itc_ros1_style_manual
@@ -149,7 +187,7 @@ RViz opens by default from this terminal.
 Terminal 2: RVIO2 -> external odom -> Kimera RGBD
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_vio.launch.py \
   sequence_name:=itc_ros1_style_manual \
@@ -166,7 +204,7 @@ Kimera TF links by default.
 Terminal 3: M2H HMX-Large
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_m2h_hmx_large.launch.py \
   dataset:=itc \
@@ -176,13 +214,14 @@ ros2 launch mono_hydra mono_hydra_itc_m2h_hmx_large.launch.py \
 ```
 
 This mirrors the explicit ROS 1 HMX-Large command. The launch wrapper keeps the
-ITC topics, simulated time, 640x480 output, `depth_scale:=1.0`, and synchronized
-RGB/CameraInfo publication fixed for the ITC stack.
+ITC topics, simulated time, `depth_scale:=1.0`, and synchronized RGB/CameraInfo
+publication fixed for the ITC stack. HMX inference runs at its native 512x384;
+the published outputs cover the complete original 848x480 image, as in ROS 1.
 
 Terminal 4: bag replay
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
   --clock --start-paused \
@@ -199,23 +238,32 @@ one launch and opens RViz by default.
 Terminal 1:
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  sequence_name:=itc_ros1_m2h_realtime
+  sequence_name:=itc_hmx_direct_tsdf045 \
+  perception_backend:=torch \
+  perception_skip_frequency:=3
 ```
 
 Terminal 2:
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd $HOME/ros1_workspaces/ros2_jazzy_ws
 source install/setup.bash
 $(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/scripts/play_itc_full_loop_ros2.sh
 ```
 
-The reference commands use normal bag timing. ONNX remains opt-in via
+The helper starts the bag paused; unpause after RVIO2, M2H, Kimera, and Hydra
+have initialized. The reference commands use normal bag timing. ONNX remains opt-in via
 `perception_backend:=onnx`; HMX-Large remains opt-in via
 `perception_backend:=torch`.
+
+The ITC launch bypasses pose-warped temporal fusion and uses a 0.45 m TSDF
+truncation band. The complete camera frame is resized and restored using the
+same policy as the ROS 1 HMX wrapper. The generic aspect-preserving crop mode
+and reusable temporal filter remain available, but neither is used by this ITC
+path.
 
 ## ScanNet Run
 

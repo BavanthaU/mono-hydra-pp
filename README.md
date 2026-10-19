@@ -1,14 +1,49 @@
-# Mono Hydra ROS 2
+<div align="center">
 
-Mono Hydra ROS 2 is a Jazzy workspace for monocular 3D scene graph construction
-from RGB, IMU, learned depth, and learned semantics. The stack keeps the
-benchmarked Mono Hydra architecture: a custom `mono_hydra_vio` module uses a
-classical R-VIO2 frontend for robust odometry, builds pose-graph and
-loop-closure proposals following the Kimera design, and passes those proposals
-to the official MIT SPARK Hydra backend for final scene-graph and mesh
-optimization.
+# Mono Hydra++
 
-![Mono Hydra pipeline](images/isprs_graphic.png)
+**Monocular 3D scene graphs from RGB and IMU**
+
+ROS 2 Jazzy · RVIO2–SuperPoint · M2H perception · Hydra mapping
+
+[ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
+
+</div>
+
+Mono Hydra++ turns monocular RGB and IMU observations into a semantic mesh and
+a layered 3D scene graph. The revised ITC flow uses SuperPoint dense tracking
+inside R-VIO2, learned metric depth and semantics from M2H, and Kimera loop
+proposals consumed by the MIT SPARK Hydra backend.
+
+## First-review ITC update
+
+This source update brings the ITC full-loop implementation and its shared
+perception, VIO, and mapping dependencies into the public repository.
+The [ITC revision guide](ITC_REVISION.md) contains the complete two-terminal
+command, model setup links, optional switches, and validation scope.
+
+| Main flow | Optional tests and fallbacks |
+| --- | --- |
+| RVIO2–SuperPoint dense tracking | Classical RVIO2 with `rvio2_variant:=classical` |
+| M2H-HMX depth and semantics | Additional perception backends remain available |
+| Kimera visual LCD → Hydra PGMO | Separate Hydra LCD switch for ablations |
+| Robust TSDF integration | Geometric reliability and temporal object association |
+| Raw M2H depth into Hydra | PTC refinement, disabled by default |
+
+```mermaid
+flowchart LR
+    camera[RGB + IMU] --> vio[RVIO2 + SuperPoint]
+    camera --> perception[M2H depth + semantics]
+    vio --> kimera[Kimera pose graph + visual LCD]
+    perception --> kimera
+    perception --> hydra[Hydra + PGMO]
+    kimera --> hydra
+    perception -. Optional PTC refinement .-> ptc[Pose-guided depth correction]
+    vio -. Camera pose .-> ptc
+    ptc -. Replaces raw depth input when enabled .-> hydra
+    hydra --> mesh[Semantic mesh]
+    hydra --> graph[Objects · Places · Rooms · Building]
+```
 
 ## Repository Layout
 
@@ -26,7 +61,7 @@ workspace:
 ```bash
 mkdir -p ~/mono_hydra_ros2_ws
 cd ~/mono_hydra_ros2_ws
-git clone git@github.com:<owner>/<repo>.git src
+git clone https://github.com/BavanthaU/mono-hydra-pp.git src
 ```
 
 Third-party source is vendored under `mono_hydra_utils`; no Git submodules are required.
@@ -36,7 +71,7 @@ The recorded upstream revisions are listed in [UPSTREAM_REPOS.md](UPSTREAM_REPOS
 
 ```text
 RGB + IMU
-  -> R-VIO2
+  -> R-VIO2 + SuperPoint dense tracking
   -> /rvio2/trajectory
   -> /external_odometry and /mono_hydra_vio/odometry
   -> mono_hydra_vio RGB-D/external-odometry pose graph
@@ -70,7 +105,7 @@ or pass them explicitly:
 
 ```bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  perception_checkpoint_path:=/path/to/m2h_hmx_large.pt
+  perception_backend:=torch perception_checkpoint_path:=/path/to/m2h_hmx_large.pt
 ```
 
 Loop-closure detection also needs the ORB vocabulary installed locally. The
@@ -82,13 +117,20 @@ src/mono_hydra_vio/scripts/download_orb_vocabulary.sh
 
 ## Build
 
+The revised ITC flow uses RVIO2–SuperPoint. Complete its
+[model and ONNX Runtime setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking)
+before building. For a classical-only build, pass
+`--cmake-args -DMONO_HYDRA_BUILD_RVIO2_SP=OFF` and use
+`rvio2_variant:=classical` when launching.
+
 Use a modest build load for workstation thermals:
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd ~/mono_hydra_ros2_ws
 source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src --ignore-src -r -y
-MAKEFLAGS="-j2" colcon build --symlink-install --continue-on-error \
+rosdep install --from-paths src src/mono_hydra_perception/mavista --ignore-src -r -y
+MAKEFLAGS="-j2" colcon build --base-paths src src/mono_hydra_perception/mavista \
+  --symlink-install --continue-on-error \
   --parallel-workers 2
 source install/setup.bash
 ```
@@ -99,22 +141,23 @@ Convert the ROS 1 ITC bag once:
 
 ```bash
 src/mono_hydra_utils/mono_hydra_utils/scripts/convert_itc_ros1_bag_to_ros2.sh \
-  /home/bavantha/ros1_workspaces/hydra2_ws/data/itc/ITC_2nd_floor_full_loop.bag
+  /path/to/ITC_2nd_floor_full_loop.bag
 ```
 
 Terminal 1:
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd ~/mono_hydra_ros2_ws
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  sequence_name:=itc_full_loop use_rviz:=true perception_backend:=torch
+  sequence_name:=itc_full_loop use_rviz:=true perception_backend:=torch \
+  rvio2_variant:=superpoint use_ptc_refinement:=false
 ```
 
 Terminal 2:
 
 ```bash
-cd /home/bavantha/ros1_workspaces/ros2_jazzy_ws
+cd ~/mono_hydra_ros2_ws
 source install/setup.bash
 ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
   --clock --qos-profile-overrides-path \

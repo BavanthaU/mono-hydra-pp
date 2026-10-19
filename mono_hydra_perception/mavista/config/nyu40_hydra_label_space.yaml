@@ -1,0 +1,49 @@
+---
+total_semantic_labels: 41
+dynamic_labels: [31]
+invalid_labels: [0, 9, 13, 16, 18, 19, 21, 23, 26, 27, 28, 37, 40]
+object_labels: [3, 4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 17, 24, 25, 29, 32, 33, 34, 35, 36, 39]
+surface_places_labels: [1, 2, 22, 30, 38]
+ground_labels: [2, 20]
+label_names:
+  - {label: 0, name: unknown_void}
+  - {label: 1, name: wall}
+  - {label: 2, name: floor}
+  - {label: 3, name: cabinet}
+  - {label: 4, name: bed}
+  - {label: 5, name: chair}
+  - {label: 6, name: sofa}
+  - {label: 7, name: table}
+  - {label: 8, name: door}
+  - {label: 9, name: window}
+  - {label: 10, name: bookshelf}
+  - {label: 11, name: picture}
+  - {label: 12, name: counter}
+  - {label: 13, name: blinds}
+  - {label: 14, name: desk}
+  - {label: 15, name: shelves}
+  - {label: 16, name: curtain}
+  - {label: 17, name: dresser}
+  - {label: 18, name: pillow}
+  - {label: 19, name: mirror}
+  - {label: 20, name: floor_mat}
+  - {label: 21, name: clothes}
+  - {label: 22, name: ceiling}
+  - {label: 23, name: books}
+  - {label: 24, name: refrigerator}
+  - {label: 25, name: television}
+  - {label: 26, name: paper}
+  - {label: 27, name: towel}
+  - {label: 28, name: shower_curtain}
+  - {label: 29, name: box}
+  - {label: 30, name: whiteboard}
+  - {label: 31, name: person}
+  - {label: 32, name: night_stand}
+  - {label: 33, name: toilet}
+  - {label: 34, name: sink}
+  - {label: 35, name: lamp}
+  - {label: 36, name: bathtub}
+  - {label: 37, name: bag}
+  - {label: 38, name: other_structure}
+  - {label: 39, name: other_furniture}
+  - {label: 40, name: other_prop}

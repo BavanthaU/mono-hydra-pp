@@ -21,9 +21,9 @@ T_BS:
 rate_hz: 20
 resolution: [848, 480]  # [width, height]
 camera_model: pinhole
-intrinsics: [523.8679783632149, 527.3991129729038, 417.35786731997706, 250.39502964565867]  # [fu, fv, cu, cv]
+intrinsics: [612.56591796875, 611.7391967773438, 417.6900329589844, 243.95521545410156]  # [fu, fv, cu, cv]
 distortion_model: radtan
-distortion_coefficients: [0.06912150, -0.10320944,  0.00040500, -0.00063706]  # model dependent
+distortion_coefficients: [0.0, 0.0, 0.0, 0.0]  # model dependent
 
 virtual_baseline: 0.3
 min_depth: 0.0

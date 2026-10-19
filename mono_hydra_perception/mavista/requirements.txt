@@ -1,0 +1,4 @@
+# Use the GPU package on x86 NVIDIA systems. Jetson users should install the
+# ONNX Runtime GPU wheel supplied for their JetPack release instead.
+onnxruntime-gpu>=1.18
+numpy>=1.24,<2.0

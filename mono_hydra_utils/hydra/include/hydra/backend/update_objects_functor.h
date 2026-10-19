@@ -46,6 +46,8 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
   struct Config {
     //! Allow mesh vertices for each object to be merged
     bool allow_connection_merging = true;
+    //! Restrict backend merges when temporal visual association owns geometry-only matches.
+    bool require_mesh_overlap = false;
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {config::VirtualConfig<AssociationStrategy>{
         association::SemanticNearestNode::Config{}}};

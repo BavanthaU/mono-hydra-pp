@@ -40,6 +40,7 @@
 #include "hydra/active_window/active_window_module.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
 #include "hydra/reconstruction/projective_integrator.h"
+#include "hydra/reconstruction/geometric_reliability.h"
 
 namespace hydra {
 
@@ -52,6 +53,7 @@ class ReconstructionModule : public ActiveWindowModule {
   struct Config : ActiveWindowModule::Config {
     double full_update_separation_s = 0.0;
     ProjectiveIntegrator::Config tsdf;
+    GeometricReliability::Config geometric_reliability;
     MeshIntegratorConfig mesh;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;
@@ -69,6 +71,7 @@ class ReconstructionModule : public ActiveWindowModule {
 
  protected:
   std::optional<uint64_t> last_update_ns_;
+  GeometricReliability geometric_reliability_;
 
   std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;

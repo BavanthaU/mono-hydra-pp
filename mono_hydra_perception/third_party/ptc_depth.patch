@@ -1,0 +1,45 @@
+diff --git a/cpp/bindings/ptc_depth_bindings.cpp b/cpp/bindings/ptc_depth_bindings.cpp
+index 4e23dd3..3cecd75 100644
+--- a/cpp/bindings/ptc_depth_bindings.cpp
++++ b/cpp/bindings/ptc_depth_bindings.cpp
+@@ -107,7 +107,11 @@ void init_ptc_depth(py::module_& m) {
+                      }
+                  }
+ 
+-                 auto result = self.refine(img, d_rel, baseline, external_R, external_t, seg_labels, flow);
++                 ptc_depth::ScaleFusionResult result;
++                 {
++                     py::gil_scoped_release release;
++                     result = self.refine(img, d_rel, baseline, external_R, external_t, seg_labels, flow);
++                 }
+ 
+                  int H = result.z_refined.rows;
+                  int W = result.z_refined.cols;
+diff --git a/cpp/src/depth_warp.cpp b/cpp/src/depth_warp.cpp
+index 5877151..125c87d 100644
+--- a/cpp/src/depth_warp.cpp
++++ b/cpp/src/depth_warp.cpp
+@@ -92,6 +92,7 @@ void warp_dense_combined(
+ 
+             float fx = flow_row[u0 * 2 + 0];
+             float fy = flow_row[u0 * 2 + 1];
++            if (!std::isfinite(fx) || !std::isfinite(fy)) continue;
+ 
+             int u1 = static_cast<int>(std::round(u0 + fx));
+             int v1_coord = static_cast<int>(std::round(v0 + fy));
+diff --git a/cpp/src/triangulation.cpp b/cpp/src/triangulation.cpp
+index 7c576f4..3bc173d 100644
+--- a/cpp/src/triangulation.cpp
++++ b/cpp/src/triangulation.cpp
+@@ -51,7 +51,10 @@ TriangulationResult Triangulator::triangulate(
+     double tx = t(0), ty = t(1), tz = t(2);
+     float fx_inv = 1.0f / cam_.fx, fy_inv = 1.0f / cam_.fy;
+ 
+-    Eigen::Matrix3d F = compute_fundamental(K_inv_, R, t);
++    // R,t map current points into the previous camera for triangulation.
++    // The residual below uses x_current^T F x_previous, requiring the inverse.
++    const Eigen::Matrix3d R_forward = R.transpose();
++    Eigen::Matrix3d F = compute_fundamental(K_inv_, R_forward, -R_forward * t);
+     Eigen::Matrix3d Ft = F.transpose();
+ 
+     struct ValidPoint {

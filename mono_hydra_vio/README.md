@@ -10,6 +10,7 @@ benchmarks, and VIO feature-conditioning utilities.
 | Node | Purpose |
 | --- | --- |
 | `rvio2_mono_node` | Monocular RGB/IMU R-VIO2 trajectory estimation |
+| `rvio2_sp_mono_node` | R-VIO2 with SuperPoint guided feature tracking (same topics as `rvio2_mono_node`) |
 | `rgb_to_mono_node` | Converts RGB image streams to the mono image stream used by R-VIO2 |
 | `odom_adapter_node` | Converts `/rvio2/trajectory` or `/external_odometry` into `/mono_hydra_vio/odometry`, `/external_odometry`, path, and TF |
 | `mono_hydra_vio_ros_node` | Native ROS 2 port of the benchmarked Kimera VIO RGB-D/external-odometry pipeline and LCD pose-graph publisher |
@@ -54,12 +55,108 @@ OpenGV, Kimera-RPGO, and ONNX Runtime dependencies vendored under
 depth, semantic-mask, and external-odometry topics into the original Kimera
 pipeline and publishes the same pose-graph topics used by the ROS 1 stack.
 
+## RVIO2-SP: SuperPoint Guided Tracking
+
+`rvio2_sp_mono_node` is built from a separate copy of R-VIO2 in `src/rvio2_sp`
+(namespace `RVIO2SP`). The classical `src/rvio2` sources and `rvio2_mono_node`
+are unchanged. Only the tracker's association step differs; RANSAC, track
+bookkeeping and the filter update are shared code.
+
+Per image, one SuperPoint pass (ONNX Runtime, CUDA) produces NMS keypoints and
+a dense descriptor map. `Tracker.Method` selects the association:
+
+- `2` **SuperPoint dense** (default in the SuperPoint configs): predict each
+  track with the IMU rotation, correlate its descriptor over a window of the
+  dense descriptor field (no re-detection needed, ambiguous peaks rejected),
+  LK-align from the previous image starting at the peak, and keep the result
+  only if the descriptor at the aligned point still matches. Geometry comes from
+  image alignment, appearance decides association.
+- `1` SuperPoint guided: match to re-detected keypoints near the prediction,
+  refine with LK, KLT fallback. Snapping to pixel-quantised keypoints breaks
+  sub-pixel continuity, so RVIO2's 0.6 px RANSAC gate drops many tracks; kept
+  for comparison.
+- `0` KLT (classical).
+
+New features come from SuperPoint keypoints (`Tracker.Detector: 1`) through the
+classical grid logic.
+
+Select the implementation with `rvio2_variant`:
+
+```bash
+# classical R-VIO2 fallback
+ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py rvio2_variant:=classical ...
+# R-VIO2 with SuperPoint tracking (ITC default)
+ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py rvio2_variant:=superpoint ...
+# same, as a wrapper
+ros2 launch mono_hydra mono_hydra_itc_rosbag_rvio2_sp.launch.py ...
+```
+
+Switches live in `config/itc_realsense_848x480_superpoint.yaml` and can be
+overridden per launch (`-1` / empty keeps the file value):
+
+| Launch argument | Config key | Values |
+| --- | --- | --- |
+| `rvio2_sp_tracker_method` | `Tracker.Method` | 0 KLT, 1 SuperPoint guided, 2 SuperPoint dense |
+| `rvio2_sp_detector` | `Tracker.Detector` | 0 Shi-Tomasi, 1 SuperPoint |
+| `rvio2_sp_gyro_prediction` | `SPTrack.GyroPrediction` | 0/1 |
+| `rvio2_sp_klt_fallback` | `SPTrack.KltFallback` | 0/1 |
+| `rvio2_sp_refine` | `SPTrack.Refine` | 0 none, 1 LK, 2 cornerSubPix |
+| `rvio2_sp_update_descriptor` | `SPTrack.UpdateDescriptor` | 0 first-frame, 1 latest |
+| `rvio2_sp_klt_gyro_prediction` | `Tracker.KltGyroPrediction` | 0/1, KLT method only |
+| `rvio2_sp_use_gpu` | `SuperPoint.UseGpu` | 0/1 |
+| `rvio2_sp_model_path` | `SuperPoint.ModelPath` | path |
+| `rvio2_sp_stats_csv` | `Stats.CsvPath` | per-frame tracking statistics |
+| `rvio2_sp_config_overrides` | any key | `"Key=value;Key=value"` |
+
+`Tracker.Method: 0` with `Tracker.Detector: 0` reproduces classical R-VIO2
+inside `rvio2_sp_mono_node`, which is useful for A/B runs with identical
+statistics logging.
+
+The SuperPoint target is enabled by default for the revised ITC flow.
+Export the ITC model from separately obtained SuperPoint v1 weights, from the
+workspace root:
+
+```bash
+python3 src/mono_hydra_vio/scripts/export_superpoint_onnx.py \
+  --weights /path/to/superpoint_v1.pth --height 480 --width 848 \
+  --output src/mono_hydra_vio/models/superpoint_480x848.onnx
+```
+
+Install ONNX Runtime C/C++ headers and its matching runtime library, export the
+model below, and build explicitly:
+
+```bash
+colcon build --packages-select mono_hydra_vio --cmake-args \
+  -DMONO_HYDRA_BUILD_RVIO2_SP=ON \
+  -DRVIO2_SP_ORT_INCLUDE_DIR=/path/to/onnxruntime/include \
+  -DRVIO2_SP_ORT_LIB_DIR=/path/to/onnxruntime/lib
+```
+
+The existing Kimera core also expects the ONNX Runtime 1.18 distribution at
+`src/mono_hydra_vio/ros1_reference/mono_hydra_vio/third_party/onnxruntime-linux-x64-gpu-1.18.0/`
+(from the workspace root), containing `include/` and `lib/`. These runtime files
+are ignored by Git and must be installed locally. The `RVIO2_SP_ORT_*` settings
+above apply to the SuperPoint target; they do not relocate Kimera's dependency.
+
+For a classical-only build, set `-DMONO_HYDRA_BUILD_RVIO2_SP=OFF` and launch
+with `rvio2_variant:=classical`.
+
+The model `models/superpoint_480x848.onnx` exposes the raw `semi` and `desc`
+heads and can be regenerated for other resolutions with
+`scripts/export_superpoint_onnx.py`. CMake links the pip `onnxruntime-gpu`
+runtime (CUDA 12) when it is importable, otherwise the bundled ONNX Runtime
+1.18; override with `-DRVIO2_SP_ORT_LIB_DIR=... -DRVIO2_SP_CUDA_LIB_DIRS=...`.
+The CUDA library paths are embedded in the binary's RPATH, so no
+`LD_LIBRARY_PATH` setup is required. The SuperPoint v1 weights are licensed by
+Magic Leap for non-commercial research use.
+
 ## Configuration
 
 R-VIO2 calibration presets:
 
 ```text
 config/itc_realsense_848x480.yaml
+config/itc_realsense_848x480_superpoint.yaml   (rvio2_sp_mono_node)
 config/uhumans2_office_720x480.yaml
 ```
 

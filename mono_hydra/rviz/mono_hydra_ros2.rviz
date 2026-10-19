@@ -5,16 +5,15 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /Scene Graph1
         - /Scene Graph1/Scene Graph Static1
         - /Scene Graph1/DSG Mesh1
         - /Input1
         - /Input1/RGB1
         - /Input1/Depth1
         - /Input1/Semantics1
-        - /VIO1
-        - /Kimera Pose Graph1
       Splitter Ratio: 0.5
-    Tree Height: 837
+    Tree Height: 443
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -76,15 +75,15 @@ Visualization Manager:
           Enabled: true
           Name: Scene Graph Static
           Namespaces:
-            interlayer_edges_2_3: true
             interlayer_edges_3_2: true
             interlayer_edges_4_3: true
+            interlayer_edges_5_4: true
             layer_2_bounding_boxes: true
             layer_2_nodes: true
             layer_2_text: true
-            layer_2p97_edges: true
-            layer_2p97_nodes: true
-            layer_2p97_text: true
+            layer_2p97_edges: false
+            layer_2p97_nodes: false
+            layer_2p97_text: false
             layer_3_edges: true
             layer_3_nodes: true
             layer_3_text: false
@@ -92,7 +91,6 @@ Visualization Manager:
             layer_3p1_nodes: true
             layer_3p1_polygon_boundaries: true
             layer_4_bounding_boxes: true
-            layer_4_edges: true
             layer_4_nodes: true
             layer_4_text: true
             layer_5_bounding_boxes: true
@@ -106,10 +104,11 @@ Visualization Manager:
             Value: /hydra_dsg_visualizer/dsg_markers
           Value: true
         - Class: kimera_pgmo_rviz/MeshDisplay
-          Cull Backfaces: false
+          Cull Backfaces: true
           Enable Lighting: false
           Enabled: true
           Name: DSG Mesh
+          Toggle Visibility All: true
           Topic:
             Depth: 5
             Durability Policy: Volatile
@@ -117,13 +116,10 @@ Visualization Manager:
             History Policy: Keep Last
             Reliability Policy: Reliable
             Value: /hydra/backend/dsg_mesh
-          Toggle Visibility All: true
           Value: true
           Visible:
+            0: true
             Value: true
-            robot0:
-              Value: true
-              dsg_mesh: true
         - Class: rviz_default_plugins/MarkerArray
           Enabled: false
           Name: Scene Graph Dynamic
@@ -142,7 +138,7 @@ Visualization Manager:
           Axes Radius: 0.009999999776482582
           Class: rviz_default_plugins/PoseArray
           Color: 255; 80; 0
-          Enabled: true
+          Enabled: false
           Head Length: 0.07000000029802322
           Head Radius: 0.029999999329447746
           Name: Hydra Agent Poses
@@ -156,7 +152,7 @@ Visualization Manager:
             History Policy: Keep Last
             Reliability Policy: Reliable
             Value: /hydra_dsg_visualizer/agent_poses
-          Value: true
+          Value: false
       Enabled: true
       Name: Scene Graph
     - Class: rviz_common/Group
@@ -349,7 +345,7 @@ Visualization Manager:
             Reliability Policy: Reliable
             Value: /mono_hydra_vio/odometry
           Value: false
-      Enabled: true
+      Enabled: false
       Name: VIO
     - Class: rviz_common/Group
       Displays:
@@ -446,7 +442,7 @@ Visualization Manager:
             Reliability Policy: Reliable
             Value: /mono_hydra_vio_ros/optimized_trajectory
           Value: true
-      Enabled: true
+      Enabled: false
       Name: Kimera Pose Graph
     - Class: rviz_common/Group
       Displays:
@@ -524,35 +520,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 31.336830139160156
+      Distance: 21.516292572021484
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 8.899800300598145
-        Y: 1.5310349464416504
-        Z: 12.968690872192383
+        X: 14.419943809509277
+        Y: 10.488168716430664
+        Z: -0.21549595892429352
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.08979745209217072
+      Pitch: 0.1047963947057724
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.361816883087158
+      Yaw: 3.5686728954315186
     Saved: ~
 Window Geometry:
   Depth:
     collapsed: false
   Displays:
-    collapsed: false
-  Height: 1043
-  Hide Left Dock: false
+    collapsed: true
+  Height: 1376
+  Hide Left Dock: true
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000003000000000000015600000380fc0200000005fb0000001800530065006d0061006e0074006900630020004900440073000000003b000000560000001600fffffffb000000100044006900730070006c006100790073010000003b00000380000000c700fffffffb0000001200530065006c0065006300740069006f006e00000001770000008f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000001b1000000ac0000005c00fffffffb0000000a0056006900650077007300000002060000016d000000a000ffffff000000010000014000000380fc0200000003fb00000006005200470042010000003b000001040000001600fffffffb0000001200530065006d0061006e00740069006300730100000145000001080000001600fffffffb0000000a004400650070007400680100000253000001680000001600ffffff000000030000078000000037fc0100000001fb0000000800540069006d00650100000000000007800000025300ffffff000004de0000038000000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000030000000000000156000004cdfc0200000005fb0000001800530065006d0061006e0074006900630020004900440073000000003b000000560000001600fffffffb000000100044006900730070006c006100790073000000003b000004cd000000c700fffffffb0000001200530065006c0065006300740069006f006e00000001770000008f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000001b1000000ac0000005c00fffffffb0000000a0056006900650077007300000002060000016d000000a000ffffff0000000100000210000004cdfc0200000003fb00000006005200470042010000003b000001970000001600fffffffb0000001200530065006d0061006e007400690063007301000001d8000001950000001600fffffffb0000000a004400650070007400680100000373000001950000001600ffffff0000000300000d7000000037fc0100000001fb0000000800540069006d0065010000000000000d700000025300ffffff00000b5a000004cd00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   RGB:
     collapsed: false
   Selection:
@@ -567,6 +563,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1920
-  X: 0
-  Y: 360
+  Width: 3440
+  X: 1920
+  Y: 27

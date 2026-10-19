@@ -35,6 +35,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/frontend/mesh_segmenter.h>
+#include <hydra/input/camera.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <kimera_pgmo/mesh_delta.h>
 
@@ -294,6 +295,106 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
       EXPECT_TRUE(checkNode(graph, node_id, expected));
     }
   }
+}
+
+TEST(MeshSegmenter, RemappedMovingSurfaceKeepsObjectIdentity) {
+  MeshSegmenter::Config config;
+  config.clustering.min_cluster_size = 4;
+  MeshSegmenter segmenter(config, {4});
+  DynamicSceneGraph graph;
+  graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
+  const Eigen::Vector3f dimensions(0.1f, 0.02f, 0.1f);
+
+  MeshDelta first({0, 0, 0});
+  addPoints(first, 4, {1, 2, 3}, dimensions);
+  stepSegmenter(first, offsets, segmenter, graph);
+  ASSERT_EQ(segmenter.getActiveNodes().size(), 1u);
+
+  std::map<size_t, size_t> remap;
+  for (size_t i = 0; i < 8; ++i) {
+    remap[i] = i;
+  }
+  // TSDF updates move the same tracked vertices beyond the old thin bounding box.
+  // Association must use their current geometry, not instantiate another object.
+  MeshDelta second(MeshDelta::TrackingInfo::with_remap(0, 8, 0, remap));
+  addPoints(second, 4, {1, 2.3f, 3}, dimensions);
+  stepSegmenter(second, offsets, segmenter, graph);
+  EXPECT_EQ(segmenter.getActiveNodes(), (std::unordered_set<NodeId>{"O0"_id}));
+  ASSERT_TRUE(graph.hasNode("O0"_id));
+  EXPECT_NEAR(graph.getNode("O0"_id).attributes().position.y(), 2.3, 1.0e-5);
+}
+
+TEST(MeshSegmenter, ProjectedOverlapRequiresRepeatedVisibleEvidence) {
+  MeshSegmenter::Config config;
+  config.clustering.min_cluster_size = 4;
+  config.use_temporal_overlap = true;
+  MeshSegmenter segmenter(config, {4});
+  DynamicSceneGraph graph;
+  graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
+  MeshDelta delta({0, 0, 0});
+  addPoints(delta, 4, {0, 0, 3}, {0.6f, 0.8f, 0.02f});
+  addPoints(delta, 4, {0, 0, 3.12f}, {0.6f, 0.8f, 0.02f});
+  delta.updateMesh(*graph.mesh(), offsets);
+  MeshSegmenter::LabelClusters clusters;
+  clusters[4] = {{{0, 0, 3}, {0, 1, 2, 3, 4, 5, 6, 7}},
+                  {{0, 0, 3.12}, {8, 9, 10, 11, 12, 13, 14, 15}}};
+  Camera::Config k;
+  k.width = 160; k.height = 120; k.fx = k.fy = 100;
+  k.cx = 80; k.cy = 60; k.min_range = 0.1; k.max_range = 10;
+  k.extrinsics = ParamSensorExtrinsics::Config{};
+  InputData observation(std::make_shared<Camera>(k, "camera"));
+  observation.world_T_body = Eigen::Isometry3d::Identity();
+  observation.depth_image = cv::Mat(120, 160, CV_32FC1, cv::Scalar(3.06f));
+  segmenter.updateGraph(1000000000, offsets, clusters, graph, &observation);
+  std::map<size_t, size_t> identity;
+  for (size_t i = 0; i < 16; ++i) { identity[i] = i; }
+  MeshDelta repeated(MeshDelta::TrackingInfo::with_remap(0, 16, 0, identity));
+  addPoints(repeated, 4, {0, 0, 3}, {0.6f, 0.8f, 0.02f});
+  addPoints(repeated, 4, {0, 0, 3.12f}, {0.6f, 0.8f, 0.02f});
+  repeated.updateMesh(*graph.mesh(), offsets);
+  ASSERT_EQ(segmenter.getActiveNodes().size(), 2u);
+  segmenter.updateGraph(1100000000, offsets, {}, graph, &observation);
+  EXPECT_EQ(segmenter.getActiveNodes().size(), 2u);
+  segmenter.updateGraph(1200000000, offsets, {}, graph, &observation);
+  EXPECT_EQ(segmenter.getActiveNodes().size(), 1u);
+  EXPECT_EQ(graph.getNode("O0"_id).attributes<ObjectNodeAttributes>().mesh_connections.size(), 16u);
+}
+
+TEST(MeshSegmenter, TemporalOverlapDoesNotMergeOccludedObjects) {
+  MeshSegmenter::Config config;
+  config.clustering.min_cluster_size = 4;
+  config.use_temporal_overlap = true;
+  MeshSegmenter segmenter(config, {4});
+  DynamicSceneGraph graph;
+  graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
+  MeshDelta delta({0, 0, 0});
+  addPoints(delta, 4, {0, 0, 3}, {0.6f, 0.8f, 0.02f});
+  addPoints(delta, 4, {0, 0, 3.12f}, {0.6f, 0.8f, 0.02f});
+  delta.updateMesh(*graph.mesh(), offsets);
+  MeshSegmenter::LabelClusters clusters;
+  clusters[4] = {{{0, 0, 3}, {0, 1, 2, 3, 4, 5, 6, 7}},
+                  {{0, 0, 3.12}, {8, 9, 10, 11, 12, 13, 14, 15}}};
+  Camera::Config k;
+  k.width = 160; k.height = 120; k.fx = k.fy = 100;
+  k.cx = 80; k.cy = 60; k.min_range = 0.1; k.max_range = 10;
+  k.extrinsics = ParamSensorExtrinsics::Config{};
+  InputData observation(std::make_shared<Camera>(k, "camera"));
+  observation.world_T_body = Eigen::Isometry3d::Identity();
+  observation.depth_image = cv::Mat(120, 160, CV_32FC1, cv::Scalar(1.0f));
+  segmenter.updateGraph(1000000000, offsets, clusters, graph, &observation);
+  std::map<size_t, size_t> identity;
+  for (size_t i = 0; i < 16; ++i) { identity[i] = i; }
+  MeshDelta repeated(MeshDelta::TrackingInfo::with_remap(0, 16, 0, identity));
+  addPoints(repeated, 4, {0, 0, 3}, {0.6f, 0.8f, 0.02f});
+  addPoints(repeated, 4, {0, 0, 3.12f}, {0.6f, 0.8f, 0.02f});
+  repeated.updateMesh(*graph.mesh(), offsets);
+  for (uint64_t t = 1100000000; t <= 1800000000; t += 100000000) {
+    segmenter.updateGraph(t, offsets, {}, graph, &observation);
+  }
+  EXPECT_EQ(segmenter.getActiveNodes().size(), 2u);
 }
 
 }  // namespace hydra

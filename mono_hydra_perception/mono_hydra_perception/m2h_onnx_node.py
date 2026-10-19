@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import copy
+import math
+import csv
 import time
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -15,6 +17,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image
+from mono_hydra_perception.latest_frame_worker import LatestFrameWorker
 
 
 def _providers(requested: str) -> List[str]:
@@ -38,6 +41,98 @@ def _color_table(num_classes: int) -> np.ndarray:
         table[idx] = ((37 * idx + 17) % 256, (67 * idx + 29) % 256, (97 * idx + 53) % 256)
     table[0] = (0, 0, 0)
     return table
+
+
+def _load_label_mapping(path: str) -> Dict[int, int]:
+    if not path:
+        return {}
+
+    import yaml
+    from yaml.loader import SafeLoader
+
+    with open(Path(path).expanduser(), encoding="utf-8") as handle:
+        data = yaml.load(handle, Loader=SafeLoader) or {}
+
+    mapping: Dict[int, int] = {}
+    if isinstance(data, dict):
+        for key, labels in data.items():
+            if not str(key).endswith("/labels") or not isinstance(labels, list):
+                continue
+            parts = str(key).split("/")
+            if len(parts) < 2:
+                continue
+            target_id = int(parts[1])
+            for label_id in labels:
+                mapping[int(label_id)] = target_id
+        if mapping:
+            return mapping
+
+        for key, value in data.items():
+            try:
+                mapping[int(key)] = int(value)
+            except (TypeError, ValueError):
+                continue
+        return mapping
+
+    if isinstance(data, list):
+        for entry in data:
+            if not isinstance(entry, dict):
+                continue
+            if "super_id" in entry and "sub_id" in entry:
+                mapping[int(entry["super_id"])] = int(entry["sub_id"])
+            elif "from" in entry and "to" in entry:
+                mapping[int(entry["from"])] = int(entry["to"])
+    return mapping
+
+
+def _load_colors(path: str) -> Optional[np.ndarray]:
+    if not path:
+        return None
+    path_obj = Path(path).expanduser()
+    if not path_obj.is_file():
+        return None
+    if path_obj.suffix.lower() == ".csv":
+        colors: Dict[int, Tuple[int, int, int]] = {}
+        with path_obj.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                idx = int(float(row.get("id", row.get("class", 0))))
+                colors[idx] = (
+                    int(float(row.get("red", 0))),
+                    int(float(row.get("green", 0))),
+                    int(float(row.get("blue", 0))),
+                )
+        if not colors:
+            return None
+        palette = np.zeros((max(colors.keys()) + 1, 3), dtype=np.uint8)
+        for idx, rgb in colors.items():
+            palette[idx] = rgb
+        return palette
+
+    try:
+        from scipy.io import loadmat
+    except Exception:
+        return None
+    colors = loadmat(path_obj).get("colors")
+    if colors is None:
+        return None
+    colors = np.asarray(colors)
+    if colors.max() <= 1.0:
+        colors = colors * 255.0
+    return np.clip(colors, 0, 255).astype(np.uint8)
+
+
+def _map_labels(label_ids: np.ndarray, mapping: Dict[int, int]) -> np.ndarray:
+    if not mapping:
+        return label_ids.astype(np.int32)
+    max_label = int(max(np.max(label_ids), max(mapping.keys()), 0))
+    lut = np.arange(max_label + 1, dtype=np.int32)
+    for src, dst in mapping.items():
+        if src >= 0:
+            if src >= len(lut):
+                lut = np.pad(lut, (0, src - len(lut) + 1), mode="edge")
+            lut[src] = int(dst)
+    clipped = np.clip(label_ids, 0, len(lut) - 1)
+    return lut[clipped].astype(np.int32)
 
 
 def _preprocess_image(
@@ -87,9 +182,9 @@ def _parse_depth(array: np.ndarray, scale: float, depth_min: float, depth_max: f
 def _parse_semantic(array: np.ndarray, num_classes: int) -> np.ndarray:
     semantic = np.asarray(array)
     if semantic.ndim == 4 and semantic.shape[0] == 1:
-        if semantic.shape[1] == num_classes or semantic.shape[1] > 1:
+        if (num_classes > 0 and semantic.shape[1] == num_classes) or semantic.shape[1] > 1:
             semantic = np.argmax(semantic[0], axis=0)
-        elif semantic.shape[3] == num_classes or semantic.shape[3] > 1:
+        elif (num_classes > 0 and semantic.shape[3] == num_classes) or semantic.shape[3] > 1:
             semantic = np.argmax(semantic[0], axis=2)
         elif semantic.shape[1] == 1:
             semantic = semantic[0, 0]
@@ -107,6 +202,7 @@ class M2HOnnxRos2Node(Node):
             self.declare_parameter("use_sim_time", False)
 
         share = Path(get_package_share_directory("mono_hydra_perception"))
+        self.declare_parameter("dataset", "")
         self.declare_parameter("model_path", str(share / "onnx_models" / "scannet_depth_sem_320x416.onnx"))
         self.declare_parameter("image_topic", "/camera/color/image_raw")
         self.declare_parameter("camera_info_topic", "/camera/color/camera_info")
@@ -120,24 +216,34 @@ class M2HOnnxRos2Node(Node):
         self.declare_parameter("publish_synced_inputs", False)
         self.declare_parameter("synced_rgb_topic", "/mono_hydra_perception/synced/image_raw")
         self.declare_parameter("synced_camera_info_topic", "/mono_hydra_perception/synced/camera_info")
-        self.declare_parameter("input_width", 416)
-        self.declare_parameter("input_height", 320)
+        self.declare_parameter("input_width", 0)
+        self.declare_parameter("input_height", 0)
         self.declare_parameter("input_color_order", "rgb")
         self.declare_parameter("model_expects_rgb", True)
         self.declare_parameter("scale_input_to_01", True)
         self.declare_parameter("normalize_mean", [0.485, 0.456, 0.406])
         self.declare_parameter("normalize_std", [0.229, 0.224, 0.225])
         self.declare_parameter("output_original_size", True)
+        self.declare_parameter("auto_configure_model_io", True)
         self.declare_parameter("publish_color_semantic", False)
-        self.declare_parameter("num_classes", 20)
+        self.declare_parameter("publish_normals", False)
+        self.declare_parameter("publish_edge", False)
+        self.declare_parameter("normals_topic", "/m2h/normals/image")
+        self.declare_parameter("edge_topic", "/m2h/edge/image")
+        self.declare_parameter("num_classes", 0)
         self.declare_parameter("semantic_encoding", "mono8")
         self.declare_parameter("depth_output_name", "")
         self.declare_parameter("semantic_output_name", "")
+        self.declare_parameter("normals_output_name", "normals")
+        self.declare_parameter("edge_output_name", "edge")
+        self.declare_parameter("label_mapping_yaml", "")
+        self.declare_parameter("color_map_path", "")
         self.declare_parameter("depth_scale", 1.0)
         self.declare_parameter("depth_min", 0.0)
         self.declare_parameter("depth_max", 10.0)
         self.declare_parameter("inference_provider", "auto")
         self.declare_parameter("skip_frequency", 3)
+        self.declare_parameter("target_fps", 0.0)
         self.declare_parameter("log_every_n_frames", 30)
         self.declare_parameter("intra_op_num_threads", 8)
         self.declare_parameter("inter_op_num_threads", 1)
@@ -149,6 +255,7 @@ class M2HOnnxRos2Node(Node):
 
         self.bridge = CvBridge()
         self.use_sim_time = bool(self.get_parameter("use_sim_time").value)
+        self.dataset = str(self.get_parameter("dataset").value).strip().lower()
         self.model_path = Path(str(self.get_parameter("model_path").value)).expanduser()
         if not self.model_path.is_file():
             raise FileNotFoundError(f"ONNX model not found: {self.model_path}")
@@ -172,11 +279,18 @@ class M2HOnnxRos2Node(Node):
         self.normalize_mean = list(self.get_parameter("normalize_mean").value)
         self.normalize_std = list(self.get_parameter("normalize_std").value)
         self.output_original_size = bool(self.get_parameter("output_original_size").value)
+        self.auto_configure_model_io = bool(self.get_parameter("auto_configure_model_io").value)
         self.publish_color_semantic = bool(self.get_parameter("publish_color_semantic").value)
+        self.publish_normals = bool(self.get_parameter("publish_normals").value)
+        self.publish_edge = bool(self.get_parameter("publish_edge").value)
+        self.normals_topic = str(self.get_parameter("normals_topic").value)
+        self.edge_topic = str(self.get_parameter("edge_topic").value)
         self.num_classes = int(self.get_parameter("num_classes").value)
         self.semantic_encoding = str(self.get_parameter("semantic_encoding").value)
         self.depth_output_name = str(self.get_parameter("depth_output_name").value)
         self.semantic_output_name = str(self.get_parameter("semantic_output_name").value)
+        self.normals_output_name = str(self.get_parameter("normals_output_name").value)
+        self.edge_output_name = str(self.get_parameter("edge_output_name").value)
         self.depth_scale = float(self.get_parameter("depth_scale").value)
         self.depth_min = float(self.get_parameter("depth_min").value)
         self.depth_max = float(self.get_parameter("depth_max").value)
@@ -184,7 +298,6 @@ class M2HOnnxRos2Node(Node):
         self.log_every_n_frames = int(self.get_parameter("log_every_n_frames").value)
         self.intra_op_num_threads = max(0, int(self.get_parameter("intra_op_num_threads").value))
         self.inter_op_num_threads = max(0, int(self.get_parameter("inter_op_num_threads").value))
-        self.color_table = _color_table(self.num_classes)
 
         options = ort.SessionOptions()
         options.log_severity_level = 2
@@ -196,12 +309,42 @@ class M2HOnnxRos2Node(Node):
         self.session = ort.InferenceSession(str(self.model_path), sess_options=options, providers=selected_providers)
         self.input_name = self.session.get_inputs()[0].name
         self.output_names = [output.name for output in self.session.get_outputs()]
+        self._configure_from_model()
+
+        mapping_path = str(self.get_parameter("label_mapping_yaml").value).strip()
+        if not mapping_path and self.dataset in ("nyud", "nyudv2", "itc"):
+            candidate = share / "config" / "colors" / "nyud40_no_unknown_config.yaml"
+            mapping_path = str(candidate) if candidate.exists() else ""
+        color_path = str(self.get_parameter("color_map_path").value).strip()
+        if not color_path:
+            color_name = ""
+            if self.dataset == "scannet":
+                color_name = "scannet20_config.csv"
+            elif self.dataset in ("nyud", "nyudv2", "itc"):
+                color_name = "nyud20_config.csv"
+            if color_name:
+                candidate = share / "config" / "colors" / color_name
+                color_path = str(candidate) if candidate.exists() else ""
+        self.label_map = _load_label_mapping(mapping_path) if mapping_path else {}
+        self.color_palette = _load_colors(color_path) if color_path else None
+        mapped_classes = max(self.label_map.values()) + 1 if self.label_map else self.num_classes
+        self.color_table = _color_table(mapped_classes if mapped_classes > 0 else 20)
 
         self.depth_pub = self.create_publisher(Image, self.depth_topic, self.output_queue_size)
         self.labels_pub = self.create_publisher(Image, self.labels_topic, self.output_queue_size)
         self.semantic_pub = (
             self.create_publisher(Image, self.semantic_topic, self.output_queue_size)
             if self.publish_color_semantic
+            else None
+        )
+        self.normals_pub = (
+            self.create_publisher(Image, self.normals_topic, self.output_queue_size)
+            if self.publish_normals
+            else None
+        )
+        self.edge_pub = (
+            self.create_publisher(Image, self.edge_topic, self.output_queue_size)
+            if self.publish_edge
             else None
         )
         self.synced_rgb_pub = (
@@ -227,29 +370,77 @@ class M2HOnnxRos2Node(Node):
         )
         if self.publish_synced_inputs:
             self.create_subscription(CameraInfo, self.camera_info_topic, self._on_camera_info, camera_info_qos)
+        target_fps = float(self.get_parameter("target_fps").value)
+        if not math.isfinite(target_fps) or target_fps < 0:
+            raise ValueError("target_fps must be finite and nonnegative")
+        self._inference_worker = (
+            LatestFrameWorker(self._infer_image, target_fps,
+                              lambda exc: self.get_logger().error(f"M2H worker failed: {exc}"))
+            if target_fps > 0 else None
+        )
+        self.get_logger().info(f"M2H source-time target_fps={target_fps}; 0 uses legacy skip_frequency")
         self.create_subscription(Image, self.image_topic, self._on_image, image_qos)
         self.frame_count = 0
         self.processed_count = 0
         self.total_inference_ms = 0.0
         self.get_logger().info(
-            f"ONNX M2H loaded model={self.model_path.name} providers={self.session.get_providers()} "
-            f"size={self.input_width}x{self.input_height} skip={self.skip_frequency} "
+            f"ONNX M2H loaded dataset={self.dataset or 'unspecified'} model={self.model_path.name} "
+            f"providers={self.session.get_providers()} size={self.input_width}x{self.input_height} "
+            f"classes={self.num_classes} skip={self.skip_frequency} "
             f"threads={self.intra_op_num_threads}/{self.inter_op_num_threads} "
             f"queue={self.input_queue_size} output_queue={self.output_queue_size} "
+            f"outputs={self.output_names} label_map={bool(self.label_map)} "
             f"synced_inputs={self.publish_synced_inputs} input_qos=best_effort warn_lag={self.warn_output_lag_s:.1f}s "
             f"drop_lag={self.max_output_lag_s:.1f}s"
         )
 
+    def _configure_from_model(self) -> None:
+        if not self.auto_configure_model_io:
+            return
+        input_shape = list(self.session.get_inputs()[0].shape)
+        if len(input_shape) == 4:
+            height, width = input_shape[2], input_shape[3]
+            if self.input_height <= 0 and isinstance(height, int) and height > 0:
+                self.input_height = int(height)
+            if self.input_width <= 0 and isinstance(width, int) and width > 0:
+                self.input_width = int(width)
+        if self.input_height <= 0 or self.input_width <= 0:
+            raise ValueError(
+                "input_width/input_height must be set when the ONNX graph does not expose static image dimensions"
+            )
+
+        if self.num_classes > 0:
+            return
+        semantic_name = self.semantic_output_name.strip()
+        outputs = self.session.get_outputs()
+        candidates = [output for output in outputs if output.name == semantic_name] if semantic_name else []
+        candidates.extend(
+            output
+            for output in outputs
+            if output.name.lower() in ("semseg", "semantic", "semantics", "semantic_logits")
+            and output not in candidates
+        )
+        candidates.extend(output for output in outputs if output not in candidates)
+        for output in candidates:
+            shape = list(output.shape)
+            if len(shape) == 4 and isinstance(shape[1], int) and shape[1] > 1:
+                self.num_classes = int(shape[1])
+                return
+            if len(shape) == 4 and isinstance(shape[3], int) and shape[3] > 1:
+                self.num_classes = int(shape[3])
+                return
+        self.num_classes = 20
+
     def _on_camera_info(self, msg: CameraInfo) -> None:
         self.latest_camera_info = msg
 
-    def _publish_synced_inputs(self, msg: Image) -> None:
+    def _publish_synced_inputs(self, msg: Image, camera_info=None) -> None:
         if not self.publish_synced_inputs or self.synced_rgb_pub is None:
             return
         self.synced_rgb_pub.publish(msg)
-        if self.synced_camera_info_pub is None or self.latest_camera_info is None:
+        if self.synced_camera_info_pub is None or camera_info is None:
             return
-        info_msg = copy.deepcopy(self.latest_camera_info)
+        info_msg = copy.deepcopy(camera_info)
         info_msg.header = msg.header
         self.synced_camera_info_pub.publish(info_msg)
 
@@ -294,10 +485,16 @@ class M2HOnnxRos2Node(Node):
         return False
 
     def _select_outputs(self, outputs: Dict[str, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
-        depth = outputs[self.depth_output_name] if self.depth_output_name else None
-        semantic = outputs[self.semantic_output_name] if self.semantic_output_name else None
+        if self.depth_output_name and self.depth_output_name not in outputs:
+            raise RuntimeError(f"depth output '{self.depth_output_name}' not found in {list(outputs)}")
+        if self.semantic_output_name and self.semantic_output_name not in outputs:
+            raise RuntimeError(f"semantic output '{self.semantic_output_name}' not found in {list(outputs)}")
+        depth = outputs.get(self.depth_output_name) if self.depth_output_name else None
+        semantic = outputs.get(self.semantic_output_name) if self.semantic_output_name else None
         if depth is None:
-            for value in outputs.values():
+            for name, value in outputs.items():
+                if name.lower() in ("semseg", "semantic", "semantics", "normals", "edge"):
+                    continue
                 arr = np.asarray(value)
                 if arr.ndim == 2 or (arr.ndim == 3 and arr.shape[0] == 1) or (arr.ndim == 4 and arr.shape[:2] == (1, 1)):
                     depth = arr
@@ -315,6 +512,39 @@ class M2HOnnxRos2Node(Node):
             raise RuntimeError(f"could not identify depth and semantic outputs from {shapes}")
         return depth, semantic
 
+    def _publish_aux_outputs(self, header, outputs: Dict[str, np.ndarray], original_size: Tuple[int, int]) -> None:
+        original_h, original_w = original_size
+        if self.normals_pub is not None and self.normals_output_name in outputs:
+            normals = np.asarray(outputs[self.normals_output_name])
+            if normals.ndim == 4 and normals.shape[0] == 1:
+                normals = normals[0]
+            if normals.ndim == 3 and normals.shape[0] == 3:
+                normals = np.transpose(normals, (1, 2, 0))
+            if normals.ndim == 3 and normals.shape[2] == 3:
+                if self.output_original_size:
+                    normals = cv2.resize(normals, (original_w, original_h), interpolation=cv2.INTER_LINEAR)
+                normals_msg = self.bridge.cv2_to_imgmsg(normals.astype(np.float32), encoding="32FC3")
+                normals_msg.header = header
+                self.normals_pub.publish(normals_msg)
+
+        if self.edge_pub is not None and self.edge_output_name in outputs:
+            edge = np.asarray(outputs[self.edge_output_name])
+            if edge.ndim == 4 and edge.shape[0] == 1 and edge.shape[1] == 1:
+                edge = edge[0, 0]
+            elif edge.ndim == 3 and edge.shape[0] == 1:
+                edge = edge[0]
+            if edge.ndim == 2:
+                if self.output_original_size:
+                    edge = cv2.resize(edge, (original_w, original_h), interpolation=cv2.INTER_LINEAR)
+                if edge.dtype.kind == "f":
+                    edge = 1.0 / (1.0 + np.exp(-edge)) if np.nanmin(edge) < 0.0 or np.nanmax(edge) > 1.0 else edge
+                    edge = np.clip(edge * 255.0, 0, 255).astype(np.uint8)
+                else:
+                    edge = np.clip(edge, 0, 255).astype(np.uint8)
+                edge_msg = self.bridge.cv2_to_imgmsg(edge, encoding="mono8")
+                edge_msg.header = header
+                self.edge_pub.publish(edge_msg)
+
     def _publish(self, header, depth: np.ndarray, semantic: np.ndarray, original_size: Tuple[int, int]) -> None:
         if self.output_original_size:
             original_h, original_w = original_size
@@ -325,20 +555,36 @@ class M2HOnnxRos2Node(Node):
         depth_msg.header = header
         self.depth_pub.publish(depth_msg)
 
+        semantic = _map_labels(semantic, self.label_map)
         labels = np.clip(semantic, 0, 255).astype(np.uint8)
         label_msg = self.bridge.cv2_to_imgmsg(labels, encoding="mono8")
         label_msg.header = header
         self.labels_pub.publish(label_msg)
 
         if self.semantic_pub is not None:
-            color_msg = self.bridge.cv2_to_imgmsg(self.color_table[labels % len(self.color_table)], encoding="rgb8")
+            if self.color_palette is not None:
+                color = self.color_palette[np.clip(labels, 0, len(self.color_palette) - 1)]
+            else:
+                color = self.color_table[labels % len(self.color_table)]
+            color_msg = self.bridge.cv2_to_imgmsg(color, encoding="rgb8")
             color_msg.header = header
             self.semantic_pub.publish(color_msg)
 
     def _on_image(self, msg: Image) -> None:
-        self.frame_count += 1
-        if self.frame_count % self.skip_frequency != 0:
+        if self._inference_worker is not None:
+            stamp = msg.header.stamp.sec * 10**9 + msg.header.stamp.nanosec
+            self._inference_worker.submit(stamp, (msg, self.latest_camera_info))
             return
+        self.frame_count += 1
+        if self.frame_count % self.skip_frequency == 0:
+            self._infer_image(msg, self.latest_camera_info)
+
+    def destroy_node(self):
+        if self._inference_worker is not None:
+            self._inference_worker.close()
+        return super().destroy_node()
+
+    def _infer_image(self, msg: Image, camera_info=None) -> None:
         if self._should_drop_for_lag(msg):
             return
         try:
@@ -356,16 +602,20 @@ class M2HOnnxRos2Node(Node):
             start = time.perf_counter()
             raw_outputs = self.session.run(self.output_names, {self.input_name: tensor})
             inference_ms = (time.perf_counter() - start) * 1000.0
-            depth_raw, semantic_raw = self._select_outputs(dict(zip(self.output_names, raw_outputs)))
+            output_dict = dict(zip(self.output_names, raw_outputs))
+            depth_raw, semantic_raw = self._select_outputs(output_dict)
             depth = _parse_depth(depth_raw, self.depth_scale, self.depth_min, self.depth_max)
             semantic = _parse_semantic(semantic_raw, self.num_classes)
             self._publish(msg.header, depth, semantic, (msg.height, msg.width))
-            self._publish_synced_inputs(msg)
+            self._publish_aux_outputs(msg.header, output_dict, (msg.height, msg.width))
+            self._publish_synced_inputs(msg, camera_info)
             self.processed_count += 1
             self.total_inference_ms += inference_ms
             if self.log_every_n_frames > 0 and self.processed_count % self.log_every_n_frames == 0:
                 avg = self.total_inference_ms / float(self.processed_count)
-                self.get_logger().info(f"ONNX M2H average inference {avg:.2f} ms")
+                worker_stats = self._inference_worker.statistics() if self._inference_worker else None
+                self.get_logger().info(f"ONNX M2H average inference {avg:.2f} ms"
+                                       + (f" worker={worker_stats}" if worker_stats is not None else ""))
         except (CvBridgeError, ValueError, RuntimeError) as exc:
             self.get_logger().warn(f"ONNX M2H skipped frame: {exc}", throttle_duration_sec=2.0)
 

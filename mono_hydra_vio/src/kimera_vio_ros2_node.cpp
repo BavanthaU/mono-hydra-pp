@@ -261,7 +261,11 @@ class KimeraLcdPublisher {
       }
     }
 
-    updateRejectedEdges();
+    // In detection-only mode PGMO, not this factor graph, owns optimization.
+    // Absence from Kimera's graph therefore does not mean a loop was rejected.
+    if (!FLAGS_lcd_no_optimize) {
+      updateRejectedEdges();
+    }
     pose_graph_nodes_.clear();
     gtsam::KeyVector keys = values.keys();
     for (const auto& key : keys) {
@@ -327,7 +331,6 @@ class KimeraLcdPublisher {
       poseToMsg(lcd_output->relative_pose_, &lc_edge.pose);
       incremental_graph.edges.push_back(lc_edge);
       loop_closure_edges_.push_back(lc_edge);
-      incremental_graph.edges.push_back(lc_edge);
     }
 
     incremental_graph.header.stamp = stampFromNs(lcd_output->timestamp_);
@@ -363,6 +366,7 @@ class KimeraBackendPublisher {
     base_link_frame_id_ =
         getOrDeclare<std::string>("base_link_frame_id", "base_link_kimera");
     publish_tf_ = getOrDeclare<bool>("publish_tf", true);
+    use_external_odom_ = getOrDeclare<bool>("use_external_odom", false);
     odometry_pub_ =
         node_.create_publisher<nav_msgs::msg::Odometry>("odometry", 1);
   }
@@ -371,8 +375,27 @@ class KimeraBackendPublisher {
     if (!output) {
       return;
     }
-    publishTf(output);
+    // With external odometry, publish that input at sensor cadence instead of
+    // the sparse Kimera backend state. Hydra needs transforms bracketing every
+    // synchronized RGB-D timestamp, while backend outputs exist only at
+    // keyframes.
+    if (!use_external_odom_) {
+      publishTf(output);
+    }
     publishOdometry(output);
+  }
+
+  void publishExternalOdomTf(const OdometryMsg& odom) {
+    if (!publish_tf_ || !use_external_odom_) {
+      return;
+    }
+
+    geometry_msgs::msg::TransformStamped odom_tf;
+    odom_tf.header.stamp = odom.header.stamp;
+    odom_tf.header.frame_id = odom_frame_id_;
+    odom_tf.child_frame_id = base_link_frame_id_;
+    poseToTransform(odometryToPose(odom), &odom_tf.transform);
+    tf_broadcaster_->sendTransform(odom_tf);
   }
 
  private:
@@ -422,6 +445,7 @@ class KimeraBackendPublisher {
   std::string odom_frame_id_;
   std::string base_link_frame_id_;
   bool publish_tf_{true};
+  bool use_external_odom_{false};
 };
 
 class KimeraRos2Visualizer : public VIO::Visualizer3D {
@@ -812,6 +836,7 @@ class KimeraVioRos2Node : public rclcpp::Node {
     if (shutdown_requested_ || !pipeline_) {
       return;
     }
+    backend_publisher_.publishExternalOdomTf(*msg);
     const gtsam::Pose3 pose = odometryToPose(*msg);
     const auto& linear = msg->twist.twist.linear;
     const gtsam::Vector3 body_vel_body(linear.x, linear.y, linear.z);

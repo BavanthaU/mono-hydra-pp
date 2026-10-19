@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "model": "GeoST-MAViSTA",
+  "checkpoint": "step_025250.pt",
+  "checkpoint_source": "outputs/train/mavista_geost_s4_thing_boundary_gpu0_20260717_050341/step_025250.pt",
+  "checkpoint_sha256": "9a0d8e2b45612549b78ce863f6a42d6fc691c5a63b58e93e77bfff28a33aa531",
+  "onnx_file": "models/mavista_geost_step025250_temporal_480x640.onnx",
+  "execution_mode": "stateful temporal ConvGRU; persistent hidden state; pose warp disabled for deployment",
+  "opset": 18,
+  "input": {
+    "image": {"shape": [1, 3, 480, 640], "layout": "NCHW", "color": "RGB", "range": [0.0, 1.0]},
+    "previous_hidden_state": {"shape": [1, 96, 30, 40]},
+    "reset_mask": {"shape": [1], "dtype": "bool", "use": "true only at process start or explicit new-environment reset"},
+    "intrinsics": {"shape": [1, 4], "order": ["fx", "fy", "cx", "cy"], "units": "pixels"}
+  },
+  "outputs": {
+    "metric_depth": {"shape": [1, 1, 480, 640], "units": "metres"},
+    "semantic_logits": {"shape": [1, 64, 480, 640], "ontology": "canonical MAViSTA"},
+    "semantic_confidence": {"shape": [1, 480, 640], "range": [0.0, 1.0]}
+  },
+  "deployment_semantics": "Argmax only over semantic_logits channels 1..40, yielding NYU40 labels 1..40; label 0 is reserved for confidence rejection. No VIO input, transform, or pose warp is included."
+}

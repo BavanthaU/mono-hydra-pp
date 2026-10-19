@@ -13,11 +13,14 @@ input:
     camera:
       receiver:
         type: ClosedSetImageReceiver
-        queue_size: 3000
+        # Match the ROS 1 ITC receiver and bound stale RGB-D accumulation.
+        queue_size: 50
       sensor:
         type: camera_info
         min_range: 0.1
-        max_range: 5.0
+        # The ITC HMX checkpoint predicts metric depth beyond this range, while
+        # Kimera accepts up to 10 m. Integrate a conservative 8 m in Hydra.
+        max_range: 8.0
         extrinsics:
           type: ros
           sensor_frame: left_cam_kimera
@@ -28,19 +31,31 @@ input:
           verbosity: 3
 map_window:
   type: spatial
-  max_radius_m: 8.0
+  # Keep the active window larger than the sensor range plus a TSDF block
+  # (16 * 0.05 = 0.8 m), otherwise far-range blocks churn at the boundary.
+  max_radius_m: 10.0
 active_window:
   full_update_separation_s: 0.2
   volumetric_map:
     voxels_per_side: 16
     voxel_size: 0.05
-    truncation_distance: 0.15
+    # Monocular HMX depth is noisier than RGB-D depth. A 0.45 m band lets
+    # overlapping predictions contribute to the same surface instead of
+    # producing one thin mesh sheet per input frame. At 0.05 m voxels this is a
+    # nine-voxel band: wide enough for HMX noise without coarsening the map.
+    truncation_distance: 0.45
   mesh:
     min_weight: 0.001
     integrator_threads: -1
   tsdf:
     verbosity: 1
     num_threads: -1
+    # Pose-conditioned TSDF innovations: retain temporal integration while bounding
+    # inconsistent monocular observations. Other datasets keep the default off.
+    use_robust_weight: true
+    robust_weight_scale_m: 0.05
+    robust_weight_scale_relative: 0.03
+    robust_weight_min_factor: 0.05
     interpolation_method: bilinear
     semantic_integrator:
       type: MLESemanticIntegrator
@@ -61,7 +76,9 @@ frontend:
     min_cluster_size: 80
     max_cluster_size: 100000
     cluster_tolerance: 0.2
-    bounding_box_type: RAABB
+    # The current rotated-box fit can exclude its own door mesh/centroid, causing
+    # a new instance on each update. AABB preserves enclosing-box association.
+    bounding_box_type: AABB
   min_object_vertices: 80
   surface_places:
     type: place_2d

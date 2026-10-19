@@ -1,0 +1,172 @@
+%YAML:1.0
+
+# RVIO2-SP config for the ITC RealSense RGB/IMU stream (rvio2_sp_mono_node).
+# Identical to itc_realsense_848x480.yaml plus the SuperPoint tracking switches.
+# Tracker.Method: 0 + Tracker.Detector: 0 reproduces classical RVIO2.
+
+#--------------------------------------------------------------------------------------------
+# IMU Parameters
+#--------------------------------------------------------------------------------------------
+IMU.dps: 200
+IMU.sigma_g: 1.6968e-04
+IMU.sigma_wg: 1.9393e-05
+IMU.sigma_a: 2.0000e-3
+IMU.sigma_wa: 3.0000e-3
+IMU.nG: 9.8082
+IMU.nSmallAngle: 0.001745329
+
+#--------------------------------------------------------------------------------------------
+# Camera Parameters
+#--------------------------------------------------------------------------------------------
+Camera.fps: 30
+Camera.width: 848
+Camera.height: 480
+Camera.RGB: 1
+Camera.Fisheye: 0
+Camera.fx: 612.5659179
+Camera.fy: 611.7391967
+Camera.cx: 417.6900329
+Camera.cy: 243.9552154
+Camera.k1: 0
+Camera.k2: 0
+Camera.p1: 0
+Camera.p2: 0
+Camera.sigma_px: 0.001632477
+Camera.sigma_py: 0.001634684
+
+Camera.T_BC0_GT: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [ 0.999931, 0.01139, -0.00300426, -0.0148924347013235,
+           -0.0114012, 0.999928, -0.00371329, 0.00011271434777882,
+            0.00296175, 0.00374728, 0.999989, -0.000207928664167412,
+            0.0, 0.0, 0.0, 1.0]
+
+Camera.T_BC0: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [0.0, -1.0, 0.0, 0.0,
+           1.0,  0.0, 0.0, 0.0,
+           0.0,  0.0, 1.0, 0.0,
+           0.0,  0.0, 0.0, 1.0]
+
+Camera.nTimeOffset_GT: 0
+Camera.nTimeOffset: 0
+
+#--------------------------------------------------------------------------------------------
+# Initialization Parameters
+#--------------------------------------------------------------------------------------------
+INI.nTimeskip: 0
+INI.RecordOutputs: 0
+INI.EnableAlignment: 1
+INI.UseGroundTruthCalib: 1
+INI.nAngleThrd: 0.3
+INI.nLengthThrd: 0.01
+
+#--------------------------------------------------------------------------------------------
+# Tracker Parameters
+#--------------------------------------------------------------------------------------------
+Tracker.nFeatures: 200
+Tracker.nMinTrackingLength: 3
+Tracker.nMaxTrackingLength: 15
+Tracker.nQualLvl: 1e-2
+Tracker.nMinDist: 15
+Tracker.nMaxSlamPoints: 0
+Tracker.nGoodParallax: 5
+Tracker.nBlockSizeX: 150
+Tracker.nBlockSizeY: 120
+Tracker.EnableFilter: 0
+Tracker.EnableEqualizer: 1
+Tracker.nRansacIter: 16
+Tracker.UseSampson: 1
+Tracker.nSampsonErrThrd: 1e-6
+Tracker.nAlgebraicErrThrd: 1e-3
+
+# Association: 0 = KLT optical flow (classical),
+#              1 = SuperPoint guided keypoint matching (snaps to re-detected keypoints),
+#              2 = SuperPoint dense descriptor search + LK alignment (recommended)
+Tracker.Method: 2
+# New-feature detector: 0 = Shi-Tomasi (classical), 1 = SuperPoint keypoints
+Tracker.Detector: 1
+# Seed classical KLT with the gyro-predicted location (Tracker.Method 0 only)
+Tracker.KltGyroPrediction: 0
+
+#--------------------------------------------------------------------------------------------
+# SuperPoint Parameters (used when Tracker.Method or Tracker.Detector is non-zero)
+#--------------------------------------------------------------------------------------------
+# Relative paths resolve against the mono_hydra_vio share directory.
+# The model must expose raw heads: semi (1x65xHcxWc) and desc (1x256xHcxWc).
+SuperPoint.ModelPath: "models/superpoint_480x848.onnx"
+SuperPoint.UseGpu: 1
+SuperPoint.RequireGpu: 0
+SuperPoint.DeviceId: 0
+SuperPoint.nThreads: 2
+# Keypoint score for spawning new features
+SuperPoint.DetThreshold: 0.005
+# Lower score for keypoints that existing tracks may be matched to
+SuperPoint.CandThreshold: 0.005
+SuperPoint.NmsRadius: 4
+SuperPoint.Border: 8
+SuperPoint.MaxKeypoints: 2000
+# 1 = run on the grayscale image before CLAHE, 0 = on the equalised image
+SuperPoint.FeedRawImage: 1
+# cornerSubPix on newly detected SuperPoint keypoints
+SuperPoint.SubPix: 1
+
+#--------------------------------------------------------------------------------------------
+# SuperPoint Guided Tracking Parameters (Tracker.Method 1; GyroPrediction also used by 2)
+#--------------------------------------------------------------------------------------------
+# Predict each track in the new image with the IMU rotation before searching
+SPTrack.GyroPrediction: 1
+# Search radius around the prediction [px]
+SPTrack.SearchRadius: 24
+# Max L2 distance between unit descriptors (0 = identical, 2 = opposite)
+SPTrack.MaxDescDist: 0.7
+# Best/second-best distance ratio inside the search window
+SPTrack.Ratio: 0.9
+# 1 = descriptor follows the track frame to frame, 0 = keep the first-frame descriptor
+SPTrack.UpdateDescriptor: 1
+# Track features SuperPoint did not re-detect with KLT, accepted if the descriptor still agrees
+SPTrack.KltFallback: 1
+SPTrack.FallbackMaxDescDist: 1.0
+# Sub-pixel refinement of descriptor matches: 0 = none, 1 = single-level LK, 2 = cornerSubPix
+SPTrack.Refine: 1
+SPTrack.RefineWin: 11
+# Refinement is discarded if it moves the match further than this [px]
+SPTrack.RefineMaxShift: 2.0
+
+#--------------------------------------------------------------------------------------------
+# SuperPoint Dense Tracking Parameters (Tracker.Method 2)
+#--------------------------------------------------------------------------------------------
+# Search window around the gyro prediction [px] and grid step [px]
+SPDense.SearchRadius: 24
+SPDense.SearchStep: 2
+# Min. cosine similarity of the descriptor peak and of the aligned point
+SPDense.MinSim: 0.75
+# Reject if a second peak outside SPDense.Exclusion [px] is nearly as similar:
+# accept when (1-best) <= PeakRatio*(1-second)
+SPDense.PeakRatio: 0.9
+SPDense.Exclusion: 8
+# LK alignment from the previous image, seeded at the peak
+SPDense.LkWin: 15
+SPDense.LkLevel: 1
+# Discard alignments that move further than this from the peak [px]
+SPDense.MaxShift: 6
+
+#--------------------------------------------------------------------------------------------
+# Statistics
+#--------------------------------------------------------------------------------------------
+# Log averaged tracking statistics every N frames (0 = off)
+Stats.LogEvery: 30
+# Per-frame CSV (empty = off); also settable with the stats_csv node parameter
+Stats.CsvPath: ""
+
+#--------------------------------------------------------------------------------------------
+# Displayer Parameters
+#--------------------------------------------------------------------------------------------
+Displayer.ShowTrack: 1
+Displayer.ShowNewer: 0
+Displayer.nLandmarkScale: 0.03
+Displayer.nLandmarkPubRate: 5

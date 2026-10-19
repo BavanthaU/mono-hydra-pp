@@ -42,6 +42,8 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "hydra/backend/backend_input.h"
 #include "hydra/backend/external_loop_closure_receiver.h"
@@ -90,7 +92,7 @@ class DsgUpdater {
 
  private:
   MergeTracker merge_tracker;
-  std::map<std::string, UpdateFunctor::Ptr> update_functors_;
+  std::vector<std::pair<std::string, UpdateFunctor::Ptr>> update_functors_;
 
   DynamicSceneGraph::Ptr source_graph_;
   SharedDsgInfo::Ptr target_dsg_;

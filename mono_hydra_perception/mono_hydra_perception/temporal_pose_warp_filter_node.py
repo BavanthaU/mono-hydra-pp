@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import warnings
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,6 +68,7 @@ class TemporalPoseWarpFilterNode(Node):
         self.declare_parameter("depth_fusion_mode", "median")
         self.declare_parameter("depth_alpha", 0.5)
         self.declare_parameter("label_min_votes", 2)
+        self.declare_parameter("fuse_labels", True)
         self.declare_parameter("dynamic_labels", "")
         self.declare_parameter("ignore_labels", "")
         self.declare_parameter("sync_queue", 5)
@@ -103,6 +105,7 @@ class TemporalPoseWarpFilterNode(Node):
         self.depth_fusion_mode = str(self.get_parameter("depth_fusion_mode").value).lower()
         self.depth_alpha = float(self.get_parameter("depth_alpha").value)
         self.label_min_votes = int(self.get_parameter("label_min_votes").value)
+        self.fuse_labels = bool(self.get_parameter("fuse_labels").value)
         self.dynamic_labels = self._parse_label_list("dynamic_labels", [])
         self.ignore_labels = self._parse_label_list("ignore_labels", [])
         self.sync_queue = int(self.get_parameter("sync_queue").value)
@@ -145,8 +148,15 @@ class TemporalPoseWarpFilterNode(Node):
             self.create_subscription(Odometry, self.pose_quality_odom_topic, self._odom_cb, 20)
 
         self.get_logger().info(
-            "temporal pose-warp filter ready depth=%s labels=%s output_depth=%s output_labels=%s history=%d"
-            % (self.depth_topic, self.label_topic, self.output_depth_topic, self.output_label_topic, self.history_size)
+            "temporal pose-warp filter ready depth=%s labels=%s output_depth=%s output_labels=%s history=%d fuse_labels=%s"
+            % (
+                self.depth_topic,
+                self.label_topic,
+                self.output_depth_topic,
+                self.output_label_topic,
+                self.history_size,
+                self.fuse_labels,
+            )
         )
 
     def _parse_label_list(self, param_name: str, default: Iterable[int]) -> List[int]:
@@ -162,12 +172,21 @@ class TemporalPoseWarpFilterNode(Node):
         self.camera_info = msg
 
     def _compute_intrinsics(self, width: int, height: int) -> Optional[Tuple[float, float, float, float, int, int]]:
-        if not self.camera_info or len(self.camera_info.k) != 9:
+        if not self.camera_info:
             return None
-        fx = float(self.camera_info.k[0])
-        fy = float(self.camera_info.k[4])
-        cx = float(self.camera_info.k[2])
-        cy = float(self.camera_info.k[5])
+        # Rectified streams should use CameraInfo.P; K is only a fallback.
+        if len(self.camera_info.p) == 12 and self.camera_info.p[0] > 0.0 and self.camera_info.p[5] > 0.0:
+            fx = float(self.camera_info.p[0])
+            fy = float(self.camera_info.p[5])
+            cx = float(self.camera_info.p[2])
+            cy = float(self.camera_info.p[6])
+        elif len(self.camera_info.k) == 9 and self.camera_info.k[0] > 0.0 and self.camera_info.k[4] > 0.0:
+            fx = float(self.camera_info.k[0])
+            fy = float(self.camera_info.k[4])
+            cx = float(self.camera_info.k[2])
+            cy = float(self.camera_info.k[5])
+        else:
+            return None
         if self.camera_info.width and self.camera_info.height:
             sx = width / float(self.camera_info.width)
             sy = height / float(self.camera_info.height)
@@ -261,7 +280,8 @@ class TemporalPoseWarpFilterNode(Node):
         labels: np.ndarray,
         intrinsics: Tuple[float, float, float, float, int, int],
         transform: Tuple[np.ndarray, np.ndarray],
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        include_labels: bool = True,
+    ) -> Tuple[np.ndarray, Optional[np.ndarray], np.ndarray]:
         fx, fy, cx, cy, width, height = intrinsics
         if self.pixel_grid is None:
             self.pixel_grid = self._build_pixel_grid(width, height)
@@ -271,7 +291,7 @@ class TemporalPoseWarpFilterNode(Node):
         if not np.any(valid):
             return (
                 np.full((height, width), np.inf, dtype=np.float32),
-                np.full((height, width), -1, dtype=np.int32),
+                np.full((height, width), -1, dtype=np.int32) if include_labels else None,
                 np.zeros((height, width), dtype=bool),
             )
         valid_idx = np.nonzero(valid)[0]
@@ -284,7 +304,7 @@ class TemporalPoseWarpFilterNode(Node):
         if not np.any(valid2):
             return (
                 np.full((height, width), np.inf, dtype=np.float32),
-                np.full((height, width), -1, dtype=np.int32),
+                np.full((height, width), -1, dtype=np.int32) if include_labels else None,
                 np.zeros((height, width), dtype=bool),
             )
         x_cur = pts_cur[0][valid2]
@@ -296,19 +316,22 @@ class TemporalPoseWarpFilterNode(Node):
         if not np.any(in_bounds):
             return (
                 np.full((height, width), np.inf, dtype=np.float32),
-                np.full((height, width), -1, dtype=np.int32),
+                np.full((height, width), -1, dtype=np.int32) if include_labels else None,
                 np.zeros((height, width), dtype=bool),
             )
         u, v, z_cur = u[in_bounds], v[in_bounds], z_cur[in_bounds]
-        src_labels = labels.reshape(-1)[valid_idx][valid2][in_bounds]
         idx = v * width + u
         warp_depth_flat = np.full(width * height, np.inf, dtype=np.float32)
         np.minimum.at(warp_depth_flat, idx, z_cur)
+        warp_depth = warp_depth_flat.reshape((height, width))
+        if not include_labels:
+            return warp_depth, None, warp_depth < np.inf
+
+        src_labels = labels.reshape(-1)[valid_idx][valid2][in_bounds]
         warp_labels_flat = np.full(width * height, -1, dtype=np.int32)
         keep = np.isclose(z_cur, warp_depth_flat[idx], rtol=1e-4, atol=1e-4)
         if np.any(keep):
             warp_labels_flat[idx[keep]] = src_labels[keep]
-        warp_depth = warp_depth_flat.reshape((height, width))
         return warp_depth, warp_labels_flat.reshape((height, width)), warp_depth < np.inf
 
     def _depth_consistent(
@@ -349,6 +372,19 @@ class TemporalPoseWarpFilterNode(Node):
         cur_valid = self._depth_valid(cur_depth)
         if not warped_depths:
             return cur_depth
+        if self.depth_fusion_mode == "median":
+            candidates = [np.where(cur_valid, cur_depth, np.nan)]
+            support = cur_valid.copy()
+            for warp_depth, warp_valid, _ in warped_depths:
+                valid = warp_valid & self._depth_consistent(warp_depth, cur_depth, cur_valid)
+                support |= valid
+                candidates.append(np.where(valid, warp_depth, np.nan))
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                fused = np.nanmedian(np.stack(candidates), axis=0).astype(np.float32)
+            fused[support] = np.clip(fused[support], self.min_depth, self.max_depth)
+            fused[~support] = 0.0
+            return fused
         if self.depth_fusion_mode == "ema":
             fused = cur_depth.copy()
             support = cur_valid.copy()
@@ -498,16 +534,26 @@ class TemporalPoseWarpFilterNode(Node):
             return
 
         self._prune_history(depth_msg.header.stamp, depth.shape)
-        warped_frames: List[Tuple[np.ndarray, np.ndarray, np.ndarray, float]] = []
+        warped_frames: List[Tuple[np.ndarray, Optional[np.ndarray], np.ndarray, float]] = []
         for frame in list(self.history):
             if self.pose_quality_mode != "none" and frame.pose_quality < self.pose_quality_skip_threshold:
                 continue
             transform = self._lookup_relative_transform(cam_frame, frame.stamp, depth_msg.header.stamp)
             if transform is not None:
-                warped_frames.append((*self._warp_frame(frame.depth, frame.labels, intrinsics, transform), frame.pose_quality))
+                warped_frames.append(
+                    (*self._warp_frame(frame.depth, frame.labels, intrinsics, transform, self.fuse_labels), frame.pose_quality)
+                )
 
         fused_depth = self._fuse_depth(depth, [(d, valid, w) for d, _, valid, w in warped_frames])
-        fused_labels = self._fuse_labels(labels, depth, warped_frames)
+        fused_labels = (
+            self._fuse_labels(
+                labels,
+                depth,
+                [(d, label, valid, w) for d, label, valid, w in warped_frames if label is not None],
+            )
+            if self.fuse_labels
+            else labels.astype(np.uint8)
+        )
 
         depth_out = self.bridge.cv2_to_imgmsg(fused_depth, encoding="32FC1")
         depth_out.header = depth_msg.header

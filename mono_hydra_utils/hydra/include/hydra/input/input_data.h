@@ -35,6 +35,9 @@ struct InputData {
   //! Depth image as planar depth in meters.
   cv::Mat depth_image;
 
+  //! Optional bounded geometric reliability (32FC1); empty preserves sensor weights.
+  cv::Mat geometric_reliability;
+
   //! Ray lengths in meters.
   cv::Mat range_image;
 

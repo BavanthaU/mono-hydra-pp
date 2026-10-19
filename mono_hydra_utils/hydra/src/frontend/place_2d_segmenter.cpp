@@ -47,6 +47,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/utils/place_2d_ellipsoid_math.h"
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 namespace {
@@ -136,6 +137,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
                               const kimera_pgmo::MeshDelta& delta,
                               const kimera_pgmo::MeshOffsetInfo& offsets,
                               const DynamicSceneGraph& graph) {
+  timing::ScopedTimer detection_timer("frontend/places_2d_detection", msg.timestamp_ns);
   VLOG(5) << "[2D Places] detect called";
   VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
   label_places_.clear();
@@ -153,8 +155,13 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
       continue;
     }
 
-    auto clusters = clustering::findClusters(config.clustering, delta, indices);
+    clustering::Clusters clusters;
+    {
+      timing::ScopedTimer timer("frontend/places_2d_clustering", msg.timestamp_ns);
+      clusters = clustering::findClusters(config.clustering, delta, indices);
+    }
 
+    timing::ScopedTimer geometry_timer("frontend/places_2d_geometry", msg.timestamp_ns);
     Places initial_places;
     for (auto& cluster_indices : clusters) {
       auto& place = initial_places.emplace_back();
@@ -182,6 +189,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
                                    const ActiveWindowOutput& /*msg*/,
                                    const kimera_pgmo::MeshOffsetInfo& offsets,
                                    DynamicSceneGraph& graph) {
+  timing::ScopedTimer update_timer("frontend/places_2d_graph_update", timestamp_ns);
   // Remove old empty nodes
   for (const auto& nid : to_remove_) {
     graph.removeNode(nid);

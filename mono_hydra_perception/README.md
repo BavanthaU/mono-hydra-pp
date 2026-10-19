@@ -10,13 +10,13 @@ expected by Hydra and the VIO feature interface.
 | --- | --- | --- | --- |
 | Original ITC M2H | `perception_backend:=m2h` | ROS 1 `m2h_indoor.pt` and `m2h_core` port | `256x256` |
 | Stock M2H-HMX-Large | `perception_backend:=torch` | vendored PyTorch configs and checkpoints | dataset-configured, overrideable |
-| ONNX export | `perception_backend:=onnx` | imported `scannet_depth_sem_320x416.onnx` model | fixed `320x416` input |
+| ONNX export | `perception_backend:=onnx` | packaged ONNX exports, including M2H-MX-B ScanNet/NYUDv2 | fixed graph input |
 
 The original ITC M2H backend is the default for ITC parity because the ROS 1
 benchmark launches `roslaunch m2h m2h.launch`. The HMX-Large backend supports
-ITC, ScanNet, and NYUD/uHumans research profiles. The ONNX backend was imported
-from the older `m2h_inference_ros` package and is kept here so the ROS 2
-workspace is independent from ROS 1 workspaces.
+ITC, ScanNet, and NYUD/uHumans research profiles. The ONNX backend uses the
+same ROS 2 topic contract as the torch backend and is the workstation/Jetson
+path for fixed-shape exports.
 
 All inference backends can publish synchronized RGB and CameraInfo alongside
 each depth/label prediction. Dataset launches use that stream for Kimera RGBD
@@ -35,6 +35,41 @@ For simulated rosbag runs, both backends also report when output frames are
 behind `/clock`. `perception_max_output_lag_s:=0.0` preserves every processed
 frame for dense parity; setting it to a positive value drops stale frames and is
 useful for responsive RViz debugging when playback outruns inference.
+
+## M2H-MX-B ONNX
+
+Place the MX base ONNX files under:
+
+```text
+mono_hydra_perception/onnx_models/m2h_mx_b_scannet_480x640.onnx
+mono_hydra_perception/onnx_models/m2h_mx_b_nyudv2_480x640.onnx
+```
+
+The existing `m2h_onnx_node` reads these models directly. It infers the static
+`480x640` input shape and 40-logit semantic head from the graph, publishes the
+standard Mono Hydra depth and label topics, and can optionally publish NYUDv2
+normals/edge outputs.
+
+ScanNet workstation run:
+
+```bash
+ros2 launch mono_hydra mono_hydra_scannet.launch.py \
+  perception_backend:=onnx \
+  onnx_model_preset:=m2h_mx_b_scannet_480x640 \
+  perception_skip_frequency:=3
+```
+
+NYUDv2 node-only smoke run:
+
+```bash
+ros2 run mono_hydra_perception m2h_onnx_node --ros-args \
+  -p dataset:=nyudv2 \
+  -p model_path:="$(ros2 pkg prefix mono_hydra_perception)/share/mono_hydra_perception/onnx_models/m2h_mx_b_nyudv2_480x640.onnx" \
+  -p image_topic:=/camera/color/image_raw \
+  -p publish_color_semantic:=true \
+  -p publish_normals:=true \
+  -p publish_edge:=true
+```
 
 ## Topics
 

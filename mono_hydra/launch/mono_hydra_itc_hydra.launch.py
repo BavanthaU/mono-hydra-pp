@@ -13,7 +13,8 @@ def generate_launch_description():
             DeclareLaunchArgument("use_rviz", default_value="true"),
             DeclareLaunchArgument("visualize", default_value="false"),
             DeclareLaunchArgument("start_mesh_marker", default_value="false"),
-            DeclareLaunchArgument("hydra_exit_after_clock", default_value="true"),
+            DeclareLaunchArgument("enable_hydra_lcd", default_value="false"),
+            DeclareLaunchArgument("hydra_exit_after_clock", default_value="false"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     PathJoinSubstitution(
@@ -29,6 +30,9 @@ def generate_launch_description():
                     "use_rvio2_bridge": "false",
                     "use_kimera_vio_ros_node": "false",
                     "use_kimera_pose_graph_bridge": "false",
+                    "use_vio_feature_interface": "false",
+                    "use_temporal_alignment": "false",
+                    "enable_hydra_lcd": LaunchConfiguration("enable_hydra_lcd"),
                     "start_mesh_marker": LaunchConfiguration("start_mesh_marker"),
                     "use_rviz": LaunchConfiguration("use_rviz"),
                     "visualize": LaunchConfiguration("visualize"),

@@ -1,0 +1,45 @@
+# M2H-MX-B NYUDv2 ONNX runtime settings for mono_hydra_perception/m2h_onnx_node.py.
+# Keep model_path package-relative in docs/launch; pass an absolute path when using ros2 run directly.
+dataset: "nyudv2"
+model_path: "$(find mono_hydra_perception)/onnx_models/m2h_mx_b_nyudv2_480x640.onnx"
+
+image_topic: "/camera/color/image_raw"
+camera_info_topic: "/camera/color/camera_info"
+image_depth_topic: "/camera/depth_cam/image_raw"
+label_ids_topic: "/camera/seg_cam/labels_argmax"
+image_semantic_topic: "/camera/seg_cam/image_raw"
+
+auto_configure_model_io: true
+input_width: 0
+input_height: 0
+input_color_order: "rgb"
+model_expects_rgb: true
+scale_input_to_01: true
+normalize_mean: [0.485, 0.456, 0.406]
+normalize_std: [0.229, 0.224, 0.225]
+
+output_original_size: true
+publish_color_semantic: true
+publish_normals: false
+publish_edge: false
+normals_topic: "/m2h/normals/image"
+edge_topic: "/m2h/edge/image"
+
+num_classes: 0
+semantic_encoding: "mono8"
+depth_output_name: "depth"
+semantic_output_name: "semseg"
+normals_output_name: "normals"
+edge_output_name: "edge"
+label_mapping_yaml: "$(find mono_hydra_perception)/config/colors/nyud40_no_unknown_config.yaml"
+color_map_path: "$(find mono_hydra_perception)/config/colors/nyud20_config.csv"
+
+depth_scale: 1.0
+depth_min: 0.0
+depth_max: 10.0
+
+inference_provider: "auto"
+skip_frequency: 3
+log_every_n_frames: 30
+intra_op_num_threads: 8
+inter_op_num_threads: 1

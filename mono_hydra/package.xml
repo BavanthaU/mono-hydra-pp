@@ -11,11 +11,13 @@
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <exec_depend>hydra</exec_depend>
   <exec_depend>hydra_ros</exec_depend>
   <exec_depend>hydra_visualizer</exec_depend>
   <exec_depend>kimera_pgmo_rviz</exec_depend>
   <exec_depend>mono_hydra_perception</exec_depend>
+  <exec_depend>mavista</exec_depend>
   <exec_depend>mono_hydra_utils</exec_depend>
   <exec_depend>mono_hydra_vio</exec_depend>
   <exec_depend>rviz2</exec_depend>

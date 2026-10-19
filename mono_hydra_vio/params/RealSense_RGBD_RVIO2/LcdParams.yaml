@@ -3,7 +3,10 @@
 use_nss: 1
 alpha: 0.1
 min_temporal_matches: 1
-recent_frames_window: 120
+# This counts Kimera keyframes, not camera/depth frames. With selected M2H
+# inputs the ITC loop can contain fewer than 120 keyframes, disabling retrieval.
+# Exclude nearby observations while allowing retrieval at this lower cadence.
+recent_frames_window: 30
 max_db_results: 100
 min_nss_factor: 0.01
 min_matches_per_island: 1
@@ -40,7 +43,9 @@ max_lc_cached_before_optimize: 10
 #TRACKER PARAMETERS for outlier rejection
 disparity_threshold: 0.5
 min_nr_2d2d_inliers: 5
-min_nr_3d3d_inliers: 3
+# Repeated corridor doors can produce minimal three-point fits with learned
+# depth. Require support beyond a minimal hypothesis before sending PGMO a loop.
+min_nr_3d3d_inliers: 10
 min_nr_2d3d_inliers: 10
 
 ransac_threshold_2d2d: 1e-04

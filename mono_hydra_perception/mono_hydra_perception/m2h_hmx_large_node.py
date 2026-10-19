@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import csv
 import copy
+import math
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -16,6 +18,51 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image
+from mono_hydra_perception.latest_frame_worker import LatestFrameWorker
+
+
+@dataclass(frozen=True)
+class _CropGeometry:
+    x0: int
+    y0: int
+    width: int
+    height: int
+
+
+def _center_crop_geometry(
+    image_height: int, image_width: int, target_height: int, target_width: int
+) -> _CropGeometry:
+    """Return the largest centered crop with the model's aspect ratio."""
+    if min(image_height, image_width, target_height, target_width) <= 0:
+        raise ValueError("image and target dimensions must be positive")
+    image_ratio = image_width / image_height
+    target_ratio = target_width / target_height
+    if image_ratio > target_ratio:
+        crop_height = image_height
+        crop_width = round(image_height * target_ratio)
+        return _CropGeometry((image_width - crop_width) // 2, 0, crop_width, crop_height)
+    crop_width = image_width
+    crop_height = round(image_width / target_ratio)
+    return _CropGeometry(0, (image_height - crop_height) // 2, crop_width, crop_height)
+
+
+def _restore_crop(
+    prediction: np.ndarray,
+    image_height: int,
+    image_width: int,
+    geometry: _CropGeometry,
+    interpolation: int,
+) -> np.ndarray:
+    """Restore a model prediction to source pixel coordinates."""
+    crop = prediction
+    if crop.shape[:2] != (geometry.height, geometry.width):
+        crop = cv2.resize(crop, (geometry.width, geometry.height), interpolation=interpolation)
+    restored = np.zeros((image_height, image_width), dtype=crop.dtype)
+    restored[
+        geometry.y0 : geometry.y0 + geometry.height,
+        geometry.x0 : geometry.x0 + geometry.width,
+    ] = crop
+    return restored
 
 
 def _load_label_mapping(path: str) -> Dict[int, int]:
@@ -77,6 +124,15 @@ def _load_colors(path: str) -> Optional[np.ndarray]:
 def _map_labels(label_ids: np.ndarray, mapping: Dict[int, int]) -> np.ndarray:
     if not mapping:
         return label_ids.astype(np.uint8)
+    if label_ids.dtype == np.uint8:
+        # Model argmax labels are uint8. Map the label vocabulary once rather
+        # than invoking Python for every pixel in the image.
+        lookup = np.fromiter(
+            (mapping.get(label, label) for label in range(256)),
+            dtype=np.uint8,
+            count=256,
+        )
+        return lookup[label_ids]
     vectorized = np.vectorize(lambda x: mapping.get(int(x), int(x)), otypes=[np.uint8])
     return vectorized(label_ids)
 
@@ -92,6 +148,7 @@ class M2HHMXLargeRos2Node(Node):
         self.declare_parameter("device", "auto")
         self.declare_parameter("half", True)
         self.declare_parameter("skip_frequency", 3)
+        self.declare_parameter("target_fps", 0.0)
         self.declare_parameter("image_topic", "/camera/color/image_raw")
         self.declare_parameter("camera_info_topic", "/camera/color/camera_info")
         self.declare_parameter("image_depth_topic", "/camera/depth_cam/image_raw")
@@ -115,10 +172,15 @@ class M2HHMXLargeRos2Node(Node):
         self.declare_parameter("depth_scale", 1.427)
         self.declare_parameter("image_height", 0)
         self.declare_parameter("image_width", 0)
+        self.declare_parameter("preserve_aspect_ratio", True)
 
         self.bridge = CvBridge()
         self.use_sim_time = bool(self.get_parameter("use_sim_time").value)
         self.dataset = str(self.get_parameter("dataset").value).lower()
+        if self.dataset == "nyudv2":
+            self.dataset = "nyud"
+        if self.dataset not in ("itc", "scannet", "nyud"):
+            raise RuntimeError("dataset must be one of: itc, scannet, nyud, nyudv2")
         self.skip_frequency = max(1, int(self.get_parameter("skip_frequency").value))
         self.image_topic = self.get_parameter("image_topic").value
         self.camera_info_topic = self.get_parameter("camera_info_topic").value
@@ -135,6 +197,7 @@ class M2HHMXLargeRos2Node(Node):
         self.publish_label_ids = bool(self.get_parameter("publish_label_ids").value)
         self.publish_color_semantic = bool(self.get_parameter("publish_color_semantic").value)
         self.depth_scale = float(self.get_parameter("depth_scale").value)
+        self.preserve_aspect_ratio = bool(self.get_parameter("preserve_aspect_ratio").value)
         self.frame_count = 0
         self.latest_camera_info: Optional[CameraInfo] = None
 
@@ -167,7 +230,7 @@ class M2HHMXLargeRos2Node(Node):
                 share / "weights" / "nyudv2_large__miou_0.656_rmse_0.380_weights.pt",
             ),
         }
-        default_config, default_checkpoint = defaults.get(self.dataset, defaults["itc"])
+        default_config, default_checkpoint = defaults[self.dataset]
         config_param = str(self.get_parameter("config_path").value)
         checkpoint_param = str(self.get_parameter("checkpoint_path").value)
         config_path = Path(config_param) if config_param else default_config
@@ -241,10 +304,21 @@ class M2HHMXLargeRos2Node(Node):
         )
         if self.publish_synced_inputs:
             self.create_subscription(CameraInfo, self.camera_info_topic, self._on_camera_info, camera_info_qos)
+        target_fps = float(self.get_parameter("target_fps").value)
+        if not math.isfinite(target_fps) or target_fps < 0:
+            raise ValueError("target_fps must be finite and nonnegative")
+        self._inference_worker = (
+            LatestFrameWorker(self._infer_image, target_fps,
+                              lambda exc: self.get_logger().error(f"M2H worker failed: {exc}"))
+            if target_fps > 0 else None
+        )
+        self.get_logger().info(f"M2H source-time target_fps={target_fps}; 0 uses legacy skip_frequency")
         self.create_subscription(Image, self.image_topic, self._on_image, image_qos)
         self.get_logger().info(
             f"real M2H-HMX-Large loaded dataset={self.dataset} device={self.device} "
             f"half={half} size={self.image_size[1]}x{self.image_size[0]} skip={self.skip_frequency} "
+            f"config={config_path} checkpoint={checkpoint_path} "
+            f"preserve_aspect_ratio={self.preserve_aspect_ratio} "
             f"queue={self.input_queue_size} output_queue={self.output_queue_size} "
             f"synced_inputs={self.publish_synced_inputs} input_qos=best_effort warn_lag={self.warn_output_lag_s:.1f}s "
             f"drop_lag={self.max_output_lag_s:.1f}s"
@@ -253,23 +327,31 @@ class M2HHMXLargeRos2Node(Node):
     def _on_camera_info(self, msg: CameraInfo) -> None:
         self.latest_camera_info = msg
 
-    def _publish_synced_inputs(self, msg: Image) -> None:
+    def _publish_synced_inputs(self, msg: Image, camera_info=None) -> None:
         if not self.publish_synced_inputs or self.synced_rgb_pub is None:
             return
         self.synced_rgb_pub.publish(msg)
-        if self.synced_camera_info_pub is None or self.latest_camera_info is None:
+        if self.synced_camera_info_pub is None or camera_info is None:
             return
-        info_msg = copy.deepcopy(self.latest_camera_info)
+        info_msg = copy.deepcopy(camera_info)
         info_msg.header = msg.header
         self.synced_camera_info_pub.publish(info_msg)
 
     def _prep_image(self, msg: Image):
         cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="rgb8")
         orig_h, orig_w, _ = cv_img.shape
-        resized = cv2.resize(cv_img, (self.image_size[1], self.image_size[0]), interpolation=cv2.INTER_LINEAR)
+        if self.preserve_aspect_ratio:
+            geometry = _center_crop_geometry(orig_h, orig_w, self.image_size[0], self.image_size[1])
+        else:
+            geometry = _CropGeometry(0, 0, orig_w, orig_h)
+        crop = cv_img[
+            geometry.y0 : geometry.y0 + geometry.height,
+            geometry.x0 : geometry.x0 + geometry.width,
+        ]
+        resized = cv2.resize(crop, (self.image_size[1], self.image_size[0]), interpolation=cv2.INTER_LINEAR)
         arr = resized.astype(np.float32) / 255.0
         tensor = self.torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).to(device=self.device, dtype=self.dtype)
-        return (tensor - self.mean) / self.std, orig_h, orig_w
+        return (tensor - self.mean) / self.std, orig_h, orig_w, geometry
 
     def _output_lag_s(self, msg: Image) -> Optional[float]:
         if not self.use_sim_time:
@@ -307,14 +389,25 @@ class M2HHMXLargeRos2Node(Node):
         return self.colorize_semseg(labels, self.mapped_num_classes)[:, :, ::-1]
 
     def _on_image(self, msg: Image) -> None:
-        self.frame_count += 1
-        if self.frame_count % self.skip_frequency != 0:
+        if self._inference_worker is not None:
+            stamp = msg.header.stamp.sec * 10**9 + msg.header.stamp.nanosec
+            self._inference_worker.submit(stamp, (msg, self.latest_camera_info))
             return
+        self.frame_count += 1
+        if self.frame_count % self.skip_frequency == 0:
+            self._infer_image(msg, self.latest_camera_info)
+
+    def destroy_node(self):
+        if self._inference_worker is not None:
+            self._inference_worker.close()
+        return super().destroy_node()
+
+    def _infer_image(self, msg: Image, camera_info=None) -> None:
         if self._should_drop_for_lag(msg):
             return
         start = time.time()
         try:
-            image_tensor, orig_h, orig_w = self._prep_image(msg)
+            image_tensor, orig_h, orig_w, geometry = self._prep_image(msg)
             outputs = self.loader.predict({"images": image_tensor, "compute_edges": False, "compute_normals": False})
         except Exception as exc:
             self.get_logger().error(f"M2H-HMX-Large inference failed: {exc}")
@@ -324,8 +417,9 @@ class M2HHMXLargeRos2Node(Node):
         if semseg_logits is not None:
             labels = self.torch.argmax(semseg_logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
             mapped_labels = _map_labels(labels, self.label_map)
-            if mapped_labels.shape[0] != orig_h or mapped_labels.shape[1] != orig_w:
-                mapped_labels = cv2.resize(mapped_labels, (orig_w, orig_h), interpolation=cv2.INTER_NEAREST)
+            mapped_labels = _restore_crop(
+                mapped_labels, orig_h, orig_w, geometry, cv2.INTER_NEAREST
+            )
             if self.labels_pub is not None:
                 labels_msg = self.bridge.cv2_to_imgmsg(mapped_labels, encoding="mono8")
                 labels_msg.header = msg.header
@@ -339,15 +433,18 @@ class M2HHMXLargeRos2Node(Node):
         if depth_pred is not None:
             depth_np = depth_pred.squeeze(0).squeeze(0).detach().cpu().numpy().astype(np.float32)
             depth_np = np.clip(depth_np * self.depth_scale, self.scaled_min_depth, self.scaled_max_depth)
-            if depth_np.shape[0] != orig_h or depth_np.shape[1] != orig_w:
-                depth_np = cv2.resize(depth_np, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
+            depth_np = _restore_crop(
+                depth_np, orig_h, orig_w, geometry, cv2.INTER_LINEAR
+            )
             depth_msg = self.bridge.cv2_to_imgmsg(depth_np.astype(np.float32), encoding="32FC1")
             depth_msg.header = msg.header
             self.depth_pub.publish(depth_msg)
 
-        self._publish_synced_inputs(msg)
+        self._publish_synced_inputs(msg, camera_info)
+        worker_stats = self._inference_worker.statistics() if self._inference_worker else None
         self.get_logger().info(
-            f"M2H-HMX-Large inference {time.time() - start:.3f}s",
+            f"M2H-HMX-Large inference {time.time() - start:.3f}s"
+            + (f" worker={worker_stats}" if worker_stats is not None else ""),
             throttle_duration_sec=5.0,
         )
 

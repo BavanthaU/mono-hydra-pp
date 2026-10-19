@@ -19,6 +19,68 @@ The main launch accepts `perception_backend:=m2h` for the original ROS 1 ITC
 M2H model, `perception_backend:=torch` for the newer M2H-HMX-Large model, and
 `perception_backend:=onnx` for the fixed-resolution ONNX export.
 
+## MAViSTA layout
+
+MAViSTA means **Metric-Aware Visual Intelligence for Semantics and Temporal
+Alignment**. The current deployed checkpoint is GeoST-MAViSTA step 025250;
+MAViSTA remains the short name used by the ROS package and launch workflow.
+
+The MAViSTA-Q model and inference node live together in the dedicated ROS 2
+package at:
+
+```text
+src/mono_hydra_perception/mavista/
+├── mavista/                 # ONNX Runtime node and geometry code
+├── launch/                  # standalone perception launch
+├── config/                  # node defaults
+├── models/                  # step-2500 ONNX model and metadata
+└── scripts/                 # model verification utilities
+```
+
+The package name exposed to ROS 2 is `mavista`. Its model file is
+installed from `models/mavista_geost_step025250_temporal_480x640.onnx`. The ROS
+node carries the model's recurrent ConvGRU hidden state from one accepted frame
+to the next; no external temporal fusion or VIO pose input is used.
+
+Mono Hydra owns only the integration launch files in
+`src/mono_hydra/launch/`:
+
+- `mono_hydra_itc_mavista_hydra.launch.py` is the canonical ITC Hydra + RViz
+  terminal used by `run_guide_mavista.md`.
+- `mono_hydra_mavista_nyuv2.launch.py` is the standalone perception-plus-Hydra
+  convenience wrapper for a camera with an existing pose/TF source.
+- `mono_hydra_scannet.launch.py` contains the shared backend switch used by
+  both MAViSTA and the other perception backends; it is not a second MAViSTA
+  node.
+
+The four-terminal ITC workflow is the source of truth for the complete run.
+The MAViSTA package consumes the existing RGB/CameraInfo topics and publishes
+only `32FC1` metric depth and `32SC1` NYU40 labels; it does not republish the
+camera stream or create odometry/camera poses.
+
+Run the convenience perception + Hydra path with an existing TF/odometry source:
+
+```bash
+ros2 launch mono_hydra mono_hydra_mavista_nyuv2.launch.py \
+  input_image_topic:=/camera/color/image_raw \
+  input_camera_info_topic:=/camera/color/camera_info \
+  provider:=cuda \
+  use_rviz:=false
+```
+
+Run MAViSTA alone for topic inspection:
+
+```bash
+ros2 launch mavista mavista.launch.py \
+  input_image_topic:=/camera/color/image_raw \
+  input_camera_info_topic:=/camera/color/camera_info \
+  provider:=cuda
+```
+
+If the camera's raw stream is distorted, run `image_proc` and pass its
+rectified image and matching CameraInfo topics instead. The node uses the
+input CameraInfo `P` matrix when valid and never substitutes NYUv2 intrinsics.
+
 ITC defaults to `perception_backend:=m2h` because the benchmarked ROS 1 ITC
 stack used the original `m2h` package with `m2h_indoor.pt`. HMX-Large and ONNX
 remain explicit overrides for research and inference checks.
@@ -28,8 +90,8 @@ remain explicit overrides for research and inference checks.
 ```text
 RGB + IMU -> mono_hydra_vio / R-VIO2 -> /mono_hydra_vio/odometry + TF
 /external_odometry -> Kimera VIO LCD-equivalent pose graph topics
-RGB -> mono_hydra_perception -> learned depth + semantic labels + synced RGB/CameraInfo
-synced RGB + CameraInfo + depth + labels + pose graph + LC proposals + TF -> hydra_ros -> DSG outputs
+RGB + CameraInfo -> MAViSTA -> learned depth + semantic labels
+original RGB + CameraInfo + depth + labels + pose graph + LC proposals + TF -> hydra_ros -> DSG outputs
 ```
 
 Hydra LCD is enabled by default. The benchmarked RVIO2 + Kimera flow is kept as
@@ -62,7 +124,7 @@ Convert an ITC ROS 1 bag:
 
 ```bash
 src/mono_hydra_utils/mono_hydra_utils/scripts/convert_itc_ros1_bag_to_ros2.sh \
-  /home/bavantha/ros1_workspaces/hydra2_ws/data/itc/ITC_2nd_floor_full_loop.bag
+  $HOME/ros1_workspaces/hydra2_ws/data/itc/ITC_2nd_floor_full_loop.bag
 ```
 
 Run ITC with the ROS 2 RViz visualizer:

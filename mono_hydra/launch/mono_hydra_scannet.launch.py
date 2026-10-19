@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 import site
+import yaml
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction, Shutdown
 from launch.conditions import IfCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
@@ -35,6 +36,30 @@ def _python_cuda_library_path() -> str:
     if existing:
         dirs.append(existing)
     return ":".join(dict.fromkeys(dirs))
+
+
+def _onnx_model_path(context, perception_share: Path) -> str:
+    explicit = LaunchConfiguration("onnx_model_path").perform(context).strip()
+    if explicit:
+        return explicit
+
+    preset = LaunchConfiguration("onnx_model_preset").perform(context).strip().lower()
+    dataset = LaunchConfiguration("perception_dataset").perform(context).strip().lower()
+    if not preset:
+        preset = "m2h_mx_b_nyudv2_480x640" if dataset in ("nyud", "nyudv2") else "m2h_mx_b_scannet_480x640"
+
+    presets = {
+        "legacy_scannet_320x416": perception_share / "onnx_models" / "scannet_depth_sem_320x416.onnx",
+        "legacy_scannet_192x256": perception_share / "onnx_models" / "scannet_depth_sem_192x256_trt_clean.onnx",
+        "m2h_mx_b_scannet": perception_share / "onnx_models" / "m2h_mx_b_scannet_480x640.onnx",
+        "m2h_mx_b_scannet_480x640": perception_share / "onnx_models" / "m2h_mx_b_scannet_480x640.onnx",
+        "m2h_mx_b_nyudv2": perception_share / "onnx_models" / "m2h_mx_b_nyudv2_480x640.onnx",
+        "m2h_mx_b_nyudv2_480x640": perception_share / "onnx_models" / "m2h_mx_b_nyudv2_480x640.onnx",
+    }
+    if preset not in presets:
+        valid = ", ".join(sorted(presets))
+        raise RuntimeError(f"Unknown onnx_model_preset '{preset}'. Valid presets: {valid}")
+    return str(presets[preset])
 
 
 def _official_hydra_group(context):
@@ -81,13 +106,31 @@ def _official_hydra_group(context):
         else LaunchConfiguration("label_topic").perform(context)
     )
 
+    refined_input = _as_bool(LaunchConfiguration("use_ptc_refinement").perform(context))
+    rgb_topic = "/mono_hydra_refinement/rgb" if refined_input else LaunchConfiguration("hydra_rgb_topic")
+    # Hydra initializes its TF listener after receiving calibration. Do not
+    # delay that initialization until the refiner has already consumed the pose.
+    info_topic = LaunchConfiguration("hydra_camera_info_topic")
+    if refined_input:
+        depth_topic = "/mono_hydra_refinement/depth"
+        label_topic = "/mono_hydra_refinement/labels"
+
+    extra = yaml.safe_load(LaunchConfiguration("hydra_extra_yaml").perform(context)) or {}
+    if not isinstance(extra, dict):
+        raise ValueError("hydra_extra_yaml must be a mapping")
+    if _as_bool(LaunchConfiguration("revision_fusion_weighting").perform(context)):
+        extra.setdefault("active_window", {}).setdefault("geometric_reliability", {})["enabled"] = True
+    if _as_bool(LaunchConfiguration("revision_object_association").perform(context)):
+        extra.setdefault("frontend", {}).setdefault("objects", {})["use_temporal_overlap"] = True
+        extra.setdefault("backend", {}).setdefault("update_functors", {}).setdefault("objects", {})["require_mesh_overlap"] = True
+
     return [
         GroupAction(
             [
-                SetRemap(src="hydra/input/camera/rgb/image_raw", dst=LaunchConfiguration("hydra_rgb_topic")),
+                SetRemap(src="hydra/input/camera/rgb/image_raw", dst=rgb_topic),
                 SetRemap(
                     src="hydra/input/camera/rgb/camera_info",
-                    dst=LaunchConfiguration("hydra_camera_info_topic"),
+                    dst=info_topic,
                 ),
                 SetRemap(src="hydra/input/camera/depth_registered/image_rect", dst=depth_topic),
                 SetRemap(src="hydra/input/camera/semantic/image_raw", dst=label_topic),
@@ -120,6 +163,7 @@ def _official_hydra_group(context):
                         "map_frame": LaunchConfiguration("map_frame"),
                         "input_config_path": input_config_path,
                         "hydra_config_path": hydra_config_path,
+                        "extra_yaml": yaml.safe_dump(extra, default_flow_style=True),
                         "labelspace_path": labelspace_path,
                         "enable_lcd": LaunchConfiguration("enable_lcd"),
                         "lcd_config_path": lcd_config_path,
@@ -221,7 +265,11 @@ def _perception_nodes(context):
                         "device": LaunchConfiguration("perception_device"),
                         "half": ParameterValue(LaunchConfiguration("perception_half"), value_type=bool),
                         "skip_frequency": ParameterValue(LaunchConfiguration("perception_skip_frequency"), value_type=int),
+                        "target_fps": ParameterValue(LaunchConfiguration("perception_target_fps"), value_type=float),
                         "depth_scale": ParameterValue(LaunchConfiguration("perception_depth_scale"), value_type=float),
+                        "preserve_aspect_ratio": ParameterValue(
+                            LaunchConfiguration("perception_preserve_aspect_ratio"), value_type=bool
+                        ),
                         "image_height": ParameterValue(LaunchConfiguration("perception_image_height"), value_type=int),
                         "image_width": ParameterValue(LaunchConfiguration("perception_image_width"), value_type=int),
                         "image_topic": LaunchConfiguration("rgb_topic"),
@@ -259,9 +307,7 @@ def _perception_nodes(context):
 
     if backend == "onnx":
         perception_share = Path(FindPackageShare("mono_hydra_perception").perform(context))
-        model_path = LaunchConfiguration("onnx_model_path").perform(context)
-        if not model_path:
-            model_path = str(perception_share / "onnx_models" / "scannet_depth_sem_320x416.onnx")
+        model_path = _onnx_model_path(context, perception_share)
         return [
             Node(
                 package="mono_hydra_perception",
@@ -272,6 +318,7 @@ def _perception_nodes(context):
                 parameters=[
                     {
                         "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
+                        "dataset": LaunchConfiguration("perception_dataset"),
                         "model_path": model_path,
                         "image_topic": LaunchConfiguration("rgb_topic"),
                         "camera_info_topic": LaunchConfiguration("camera_info_topic"),
@@ -296,12 +343,28 @@ def _perception_nodes(context):
                         "synced_rgb_topic": LaunchConfiguration("perception_synced_rgb_topic"),
                         "synced_camera_info_topic": LaunchConfiguration("perception_synced_camera_info_topic"),
                         "publish_color_semantic": ParameterValue(publish_color_semantic, value_type=bool),
+                        "publish_normals": ParameterValue(LaunchConfiguration("onnx_publish_normals"), value_type=bool),
+                        "publish_edge": ParameterValue(LaunchConfiguration("onnx_publish_edge"), value_type=bool),
+                        "normals_topic": LaunchConfiguration("onnx_normals_topic"),
+                        "edge_topic": LaunchConfiguration("onnx_edge_topic"),
+                        "auto_configure_model_io": ParameterValue(
+                            LaunchConfiguration("onnx_auto_configure_model_io"), value_type=bool
+                        ),
                         "input_width": ParameterValue(LaunchConfiguration("onnx_input_width"), value_type=int),
                         "input_height": ParameterValue(LaunchConfiguration("onnx_input_height"), value_type=int),
                         "num_classes": ParameterValue(LaunchConfiguration("onnx_num_classes"), value_type=int),
-                        "depth_scale": ParameterValue(LaunchConfiguration("perception_depth_scale"), value_type=float),
+                        "depth_output_name": LaunchConfiguration("onnx_depth_output_name"),
+                        "semantic_output_name": LaunchConfiguration("onnx_semantic_output_name"),
+                        "normals_output_name": LaunchConfiguration("onnx_normals_output_name"),
+                        "edge_output_name": LaunchConfiguration("onnx_edge_output_name"),
+                        "label_mapping_yaml": LaunchConfiguration("onnx_label_mapping_yaml"),
+                        "color_map_path": LaunchConfiguration("onnx_color_map_path"),
+                        "depth_scale": ParameterValue(LaunchConfiguration("onnx_depth_scale"), value_type=float),
+                        "depth_min": ParameterValue(LaunchConfiguration("onnx_depth_min"), value_type=float),
+                        "depth_max": ParameterValue(LaunchConfiguration("onnx_depth_max"), value_type=float),
                         "inference_provider": LaunchConfiguration("onnx_provider"),
                         "skip_frequency": ParameterValue(LaunchConfiguration("perception_skip_frequency"), value_type=int),
+                        "target_fps": ParameterValue(LaunchConfiguration("perception_target_fps"), value_type=float),
                         "intra_op_num_threads": ParameterValue(
                             LaunchConfiguration("onnx_intra_op_num_threads"), value_type=int
                         ),
@@ -313,7 +376,50 @@ def _perception_nodes(context):
             )
         ]
 
-    raise RuntimeError(f"Unknown perception_backend '{backend}'. Use 'm2h', 'torch', or 'onnx'.")
+    if backend in ("mavista", "mavista_q", "mavista_hydra"):
+        mavista_share = Path(FindPackageShare("mavista").perform(context))
+        model_path = LaunchConfiguration("mavista_model_path").perform(context).strip()
+        if not model_path:
+            model_path = str(mavista_share / "models" / "mavista_geost_step025250_temporal_480x640.onnx")
+        return [
+            Node(
+                package="mavista",
+                executable="mavista_node",
+                name="mavista",
+                output="screen",
+                additional_env={"LD_LIBRARY_PATH": _python_cuda_library_path()},
+                parameters=[
+                    str(mavista_share / "config" / "mavista.yaml"),
+                    {
+                        "model_path": model_path,
+                        "provider": LaunchConfiguration("mavista_provider"),
+                        "input_image_topic": LaunchConfiguration("rgb_topic"),
+                        "input_camera_info_topic": LaunchConfiguration("camera_info_topic"),
+                        "output_depth_topic": LaunchConfiguration("mavista_output_depth_topic"),
+                        "output_semantic_topic": LaunchConfiguration("mavista_output_semantic_topic"),
+                        "output_semantic_visualization_topic": LaunchConfiguration(
+                            "mavista_output_semantic_visualization_topic"
+                        ),
+                        "output_semantic_confidence_topic": LaunchConfiguration(
+                            "mavista_output_semantic_confidence_topic"
+                        ),
+                        "semantic_confidence_threshold": ParameterValue(
+                            LaunchConfiguration("mavista_semantic_confidence_threshold"), value_type=float
+                        ),
+                        "min_depth_m": ParameterValue(LaunchConfiguration("mavista_min_depth_m"), value_type=float),
+                        "max_depth_m": ParameterValue(LaunchConfiguration("mavista_max_depth_m"), value_type=float),
+                        "sync_slop_s": ParameterValue(LaunchConfiguration("mavista_sync_slop_s"), value_type=float),
+                        "publish_diagnostics": ParameterValue(
+                            LaunchConfiguration("mavista_publish_diagnostics"), value_type=bool
+                        ),
+                    },
+                ],
+            )
+        ]
+
+    raise RuntimeError(
+        f"Unknown perception_backend '{backend}'. Use 'm2h', 'torch', 'onnx', or 'mavista'."
+    )
 
 
 def _temporal_alignment_node(context):
@@ -361,6 +467,7 @@ def _temporal_alignment_node(context):
                     "depth_fusion_mode": LaunchConfiguration("temporal_depth_fusion_mode"),
                     "depth_alpha": ParameterValue(LaunchConfiguration("temporal_depth_alpha"), value_type=float),
                     "label_min_votes": ParameterValue(LaunchConfiguration("temporal_label_min_votes"), value_type=int),
+                    "fuse_labels": ParameterValue(LaunchConfiguration("temporal_fuse_labels"), value_type=bool),
                     "dynamic_labels": LaunchConfiguration("temporal_dynamic_labels"),
                     "ignore_labels": LaunchConfiguration("temporal_ignore_labels"),
                     "sync_queue": ParameterValue(LaunchConfiguration("temporal_sync_queue"), value_type=int),
@@ -373,6 +480,38 @@ def _temporal_alignment_node(context):
             ],
         )
     ]
+
+
+
+def _ptc_refinement_node(context):
+    if not _as_bool(LaunchConfiguration("use_ptc_refinement").perform(context)):
+        return []
+    if _as_bool(LaunchConfiguration("use_temporal_alignment").perform(context)):
+        raise RuntimeError("PTC uses raw M2H inputs; disable use_temporal_alignment")
+    if not _as_bool(LaunchConfiguration("perception_publish_synced_inputs").perform(context)):
+        raise RuntimeError("PTC requires perception_publish_synced_inputs:=true")
+    extra_path = LaunchConfiguration("ptc_python_path").perform(context)
+    python_path = os.pathsep.join(p for p in (extra_path, os.environ.get("PYTHONPATH", "")) if p)
+    return [Node(
+        package="mono_hydra_perception", executable="ptc_refinement_node",
+        name="ptc_depth_refinement", output="screen",
+        additional_env={"PYTHONPATH": python_path, "OMP_NUM_THREADS": "2"},
+        on_exit=[Shutdown(reason="PTC refinement process exited")],
+        parameters=[{
+            "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
+            "rgb_topic": LaunchConfiguration("hydra_rgb_topic"),
+            "camera_info_topic": LaunchConfiguration("hydra_camera_info_topic"),
+            "depth_topic": LaunchConfiguration("depth_topic"),
+            "labels_topic": LaunchConfiguration("label_topic"),
+            "camera_frame": LaunchConfiguration("camera_frame"),
+            "fixed_frame": LaunchConfiguration("odom_frame"),
+            "width": ParameterValue(LaunchConfiguration("ptc_width"), value_type=int),
+            "references": ParameterValue(LaunchConfiguration("ptc_references"), value_type=int),
+            "local": ParameterValue(LaunchConfiguration("ptc_local"), value_type=bool),
+            "max_scale_change": ParameterValue(LaunchConfiguration("ptc_max_scale_change"), value_type=float),
+            "metrics_path": PathJoinSubstitution([LaunchConfiguration("output_root"),
+                LaunchConfiguration("sequence_name"), "ptc_metrics.jsonl"]),
+        }])]
 
 
 def generate_launch_description():
@@ -426,7 +565,11 @@ def generate_launch_description():
         DeclareLaunchArgument("hydra_labelspace_path", default_value=""),
         DeclareLaunchArgument("hydra_input_config_path", default_value=""),
         DeclareLaunchArgument("hydra_config_path", default_value=""),
+        DeclareLaunchArgument("hydra_extra_yaml", default_value="{}"),
+        DeclareLaunchArgument("revision_fusion_weighting", default_value="false"),
+        DeclareLaunchArgument("revision_object_association", default_value="false"),
         DeclareLaunchArgument("enable_lcd", default_value="true"),
+        DeclareLaunchArgument("enable_kimera_lcd", default_value=LaunchConfiguration("enable_lcd")),
         DeclareLaunchArgument("lcd_config_path", default_value=""),
         DeclareLaunchArgument("hydra_exit_after_clock", default_value="false"),
         DeclareLaunchArgument("use_hydra_backend", default_value="true"),
@@ -436,10 +579,18 @@ def generate_launch_description():
         DeclareLaunchArgument("perception_device", default_value="auto"),
         DeclareLaunchArgument("perception_half", default_value="true"),
         DeclareLaunchArgument("perception_depth_scale", default_value="1.427"),
+        DeclareLaunchArgument("perception_preserve_aspect_ratio", default_value="true"),
         DeclareLaunchArgument("perception_image_height", default_value="0"),
         DeclareLaunchArgument("perception_image_width", default_value="0"),
         DeclareLaunchArgument("perception_publish_color_semantic", default_value="false"),
         DeclareLaunchArgument("perception_skip_frequency", default_value="3"),
+        DeclareLaunchArgument("perception_target_fps", default_value="0.0"),
+        DeclareLaunchArgument("use_ptc_refinement", default_value="false"),
+        DeclareLaunchArgument("ptc_python_path", default_value=os.environ.get("PTC_DEPTH_PYTHONPATH", "")),
+        DeclareLaunchArgument("ptc_width", default_value="424"),
+        DeclareLaunchArgument("ptc_references", default_value="1"),
+        DeclareLaunchArgument("ptc_local", default_value="true"),
+        DeclareLaunchArgument("ptc_max_scale_change", default_value="0.10"),
         DeclareLaunchArgument("perception_input_queue_size", default_value="256"),
         DeclareLaunchArgument("perception_output_queue_size", default_value="10"),
         DeclareLaunchArgument("perception_warn_output_lag_s", default_value="5.0"),
@@ -480,14 +631,58 @@ def generate_launch_description():
             ),
         ),
         DeclareLaunchArgument("onnx_model_path", default_value=""),
-        DeclareLaunchArgument("onnx_input_width", default_value="416"),
-        DeclareLaunchArgument("onnx_input_height", default_value="320"),
-        DeclareLaunchArgument("onnx_num_classes", default_value="20"),
+        DeclareLaunchArgument("onnx_model_preset", default_value="m2h_mx_b_scannet_480x640"),
+        DeclareLaunchArgument("onnx_auto_configure_model_io", default_value="true"),
+        DeclareLaunchArgument("onnx_input_width", default_value="0"),
+        DeclareLaunchArgument("onnx_input_height", default_value="0"),
+        DeclareLaunchArgument("onnx_num_classes", default_value="0"),
+        DeclareLaunchArgument("onnx_depth_output_name", default_value=""),
+        DeclareLaunchArgument("onnx_semantic_output_name", default_value=""),
+        DeclareLaunchArgument("onnx_normals_output_name", default_value="normals"),
+        DeclareLaunchArgument("onnx_edge_output_name", default_value="edge"),
+        DeclareLaunchArgument("onnx_label_mapping_yaml", default_value=""),
+        DeclareLaunchArgument("onnx_color_map_path", default_value=""),
+        DeclareLaunchArgument("onnx_depth_scale", default_value="1.0"),
+        DeclareLaunchArgument("onnx_depth_min", default_value="0.0"),
+        DeclareLaunchArgument("onnx_depth_max", default_value="10.0"),
+        DeclareLaunchArgument("onnx_publish_normals", default_value="false"),
+        DeclareLaunchArgument("onnx_publish_edge", default_value="false"),
+        DeclareLaunchArgument("onnx_normals_topic", default_value="/m2h/normals/image"),
+        DeclareLaunchArgument("onnx_edge_topic", default_value="/m2h/edge/image"),
         DeclareLaunchArgument("onnx_provider", default_value="auto"),
         DeclareLaunchArgument("onnx_intra_op_num_threads", default_value="8"),
         DeclareLaunchArgument("onnx_inter_op_num_threads", default_value="1"),
+        DeclareLaunchArgument(
+            "mavista_model_path",
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare("mavista"),
+                    "models",
+                    "mavista_geost_step025250_temporal_480x640.onnx",
+                ]
+            ),
+        ),
+        DeclareLaunchArgument("mavista_provider", default_value="auto"),
+        DeclareLaunchArgument("mavista_semantic_confidence_threshold", default_value="0.0"),
+        DeclareLaunchArgument("mavista_min_depth_m", default_value="0.1"),
+        DeclareLaunchArgument("mavista_max_depth_m", default_value="10.0"),
+        DeclareLaunchArgument("mavista_sync_slop_s", default_value="0.03"),
+        DeclareLaunchArgument("mavista_publish_diagnostics", default_value="true"),
+        DeclareLaunchArgument("mavista_output_depth_topic", default_value="/hydra/camera/depth/image_rect"),
+        DeclareLaunchArgument(
+            "mavista_output_semantic_topic", default_value="/hydra/camera/semantic/image_raw"
+        ),
+        DeclareLaunchArgument(
+            "mavista_output_semantic_visualization_topic",
+            default_value="/mavista/semantic/visualization",
+        ),
+        DeclareLaunchArgument(
+            "mavista_output_semantic_confidence_topic", default_value="/mavista/semantic/confidence"
+        ),
         DeclareLaunchArgument("use_rvio2_backend", default_value="false"),
         DeclareLaunchArgument("use_rvio2_bridge", default_value="false"),
+        DeclareLaunchArgument("use_vio_feature_interface", default_value="true"),
+        DeclareLaunchArgument("use_odom_adapter", default_value="true"),
         DeclareLaunchArgument("odom_adapter_publish_tf", default_value="true"),
         DeclareLaunchArgument("odom_adapter_force_frame_ids", default_value="true"),
         DeclareLaunchArgument("use_kimera_vio_ros_node", default_value="true"),
@@ -539,6 +734,24 @@ def generate_launch_description():
         DeclareLaunchArgument("external_odom_topic", default_value="/external_odometry"),
         DeclareLaunchArgument("rvio2_trajectory_topic", default_value="/rvio2/trajectory"),
         DeclareLaunchArgument("rvio2_config_path", default_value=""),
+        # RVIO2 implementation: classical (rvio2_mono_node, KLT) or superpoint
+        # (rvio2_sp_mono_node, SuperPoint guided tracking).
+        DeclareLaunchArgument("rvio2_variant", default_value="classical", choices=["classical", "superpoint"]),
+        # Config for rvio2_sp_mono_node; empty uses rvio2_config_path.
+        DeclareLaunchArgument("rvio2_sp_config_path", default_value=""),
+        # Per-launch overrides of the RVIO2-SP config switches (-1 / "" keep the file value).
+        DeclareLaunchArgument("rvio2_sp_tracker_method", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_detector", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_gyro_prediction", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_klt_fallback", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_refine", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_update_descriptor", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_klt_gyro_prediction", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_use_gpu", default_value="-1"),
+        DeclareLaunchArgument("rvio2_sp_model_path", default_value=""),
+        DeclareLaunchArgument("rvio2_sp_stats_csv", default_value=""),
+        # Extra config keys, e.g. "SuperPoint.DetThreshold=0.005;SPTrack.SearchRadius=32"
+        DeclareLaunchArgument("rvio2_sp_config_overrides", default_value=""),
         DeclareLaunchArgument("rvio2_mono_image_topic", default_value="/rvio2/cam0/image_raw"),
         DeclareLaunchArgument(
             "rvio2_left_camera_params_path",
@@ -576,6 +789,7 @@ def generate_launch_description():
         DeclareLaunchArgument("temporal_depth_fusion_mode", default_value="median"),
         DeclareLaunchArgument("temporal_depth_alpha", default_value="0.5"),
         DeclareLaunchArgument("temporal_label_min_votes", default_value="2"),
+        DeclareLaunchArgument("temporal_fuse_labels", default_value="true"),
         DeclareLaunchArgument("temporal_dynamic_labels", default_value=""),
         DeclareLaunchArgument("temporal_ignore_labels", default_value=""),
         DeclareLaunchArgument("temporal_sync_queue", default_value="5"),
@@ -673,7 +887,10 @@ def generate_launch_description():
         executable="rvio2_mono_node",
         name="rvio2_mono_node",
         output="screen",
-        condition=IfCondition(LaunchConfiguration("use_rvio2_backend")),
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("use_rvio2_backend"), "'.lower() in ('true', '1') and '",
+            LaunchConfiguration("rvio2_variant"), "' == 'classical'",
+        ])),
         parameters=[
             {
                 "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
@@ -685,11 +902,48 @@ def generate_launch_description():
         ],
     )
 
+    rvio2_sp_node = Node(
+        package="mono_hydra_vio",
+        executable="rvio2_sp_mono_node",
+        name="rvio2_sp_mono_node",
+        output="screen",
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("use_rvio2_backend"), "'.lower() in ('true', '1') and '",
+            LaunchConfiguration("rvio2_variant"), "' == 'superpoint'",
+        ])),
+        parameters=[
+            {
+                "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
+                "image_topic": LaunchConfiguration("rvio2_mono_image_topic"),
+                "imu_topic": LaunchConfiguration("imu_topic"),
+                "config_path": PythonExpression([
+                    "'", LaunchConfiguration("rvio2_sp_config_path"), "' or '",
+                    LaunchConfiguration("rvio2_config_path"), "'",
+                ]),
+                "publish_tf": False,
+                "tracker_method": ParameterValue(LaunchConfiguration("rvio2_sp_tracker_method"), value_type=int),
+                "detector": ParameterValue(LaunchConfiguration("rvio2_sp_detector"), value_type=int),
+                "gyro_prediction": ParameterValue(LaunchConfiguration("rvio2_sp_gyro_prediction"), value_type=int),
+                "klt_fallback": ParameterValue(LaunchConfiguration("rvio2_sp_klt_fallback"), value_type=int),
+                "refine": ParameterValue(LaunchConfiguration("rvio2_sp_refine"), value_type=int),
+                "update_descriptor": ParameterValue(LaunchConfiguration("rvio2_sp_update_descriptor"), value_type=int),
+                "klt_gyro_prediction": ParameterValue(
+                    LaunchConfiguration("rvio2_sp_klt_gyro_prediction"), value_type=int
+                ),
+                "superpoint_use_gpu": ParameterValue(LaunchConfiguration("rvio2_sp_use_gpu"), value_type=int),
+                "superpoint_model_path": LaunchConfiguration("rvio2_sp_model_path"),
+                "stats_csv": LaunchConfiguration("rvio2_sp_stats_csv"),
+                "config_overrides": LaunchConfiguration("rvio2_sp_config_overrides"),
+            }
+        ],
+    )
+
     vio_feature_node = Node(
         package="mono_hydra_vio",
         executable="vio_feature_interface_node",
         name="mono_hydra_vio_feature_interface",
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_vio_feature_interface")),
         parameters=[
             {
                 "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
@@ -712,6 +966,7 @@ def generate_launch_description():
         executable="odom_adapter_node",
         name="mono_hydra_vio_odom_adapter",
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_odom_adapter")),
         parameters=[
             {
                 "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
@@ -767,7 +1022,7 @@ def generate_launch_description():
                 "use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool),
                 "params_folder_path": LaunchConfiguration("kimera_params_folder"),
                 "sensor_params_folder_path": LaunchConfiguration("kimera_sensor_params_folder"),
-                "use_lcd": ParameterValue(LaunchConfiguration("enable_lcd"), value_type=bool),
+                "use_lcd": ParameterValue(LaunchConfiguration("enable_kimera_lcd"), value_type=bool),
                 "use_external_odom": ParameterValue(LaunchConfiguration("kimera_use_external_odom"), value_type=bool),
                 "lcd_no_optimize": ParameterValue(LaunchConfiguration("kimera_lcd_no_optimize"), value_type=bool),
                 "lcd_no_detection": ParameterValue(LaunchConfiguration("kimera_lcd_no_detection"), value_type=bool),
@@ -879,6 +1134,7 @@ def generate_launch_description():
             base_to_camera_tf,
             rgb_to_mono_node,
             rvio2_node,
+            rvio2_sp_node,
             vio_feature_node,
             odom_adapter_node,
             kimera_vio_ros_node,
@@ -886,6 +1142,7 @@ def generate_launch_description():
             mesh_marker_node,
             OpaqueFunction(function=_perception_nodes),
             OpaqueFunction(function=_temporal_alignment_node),
+            OpaqueFunction(function=_ptc_refinement_node),
             OpaqueFunction(function=_official_hydra_group),
             rviz_node,
         ]

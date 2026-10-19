@@ -8,9 +8,9 @@ package_name = "mono_hydra_perception"
 def package_data_files() -> list[tuple[str, list[str]]]:
     entries: list[tuple[str, list[str]]] = [
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
-        (f"share/{package_name}", ["package.xml", "README.md"]),
+        (f"share/{package_name}", ["package.xml", "README.md", "PTC_REFINEMENT.md"]),
     ]
-    for directory in ("config", "weights", "onnx_models"):
+    for directory in ("config", "weights", "onnx_models", "scripts", "third_party"):
         root = Path(directory)
         if not root.exists():
             continue
@@ -45,6 +45,7 @@ setup(
             "m2h_hmx_large_node = mono_hydra_perception.m2h_hmx_large_node:main",
             "m2h_legacy_node = mono_hydra_perception.m2h_legacy_node:main",
             "m2h_onnx_node = mono_hydra_perception.m2h_onnx_node:main",
+            "ptc_refinement_node = mono_hydra_perception.ptc_refinement_node:main",
             "temporal_pose_warp_filter_node = mono_hydra_perception.temporal_pose_warp_filter_node:main",
         ],
     },
