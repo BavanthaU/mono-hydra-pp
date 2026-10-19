@@ -29,7 +29,7 @@ def generate_launch_description():
             DeclareLaunchArgument("use_kimera_vio_ros_node", default_value="true"),
             DeclareLaunchArgument("use_kimera_pose_graph_bridge", default_value="true"),
             DeclareLaunchArgument("start_mesh_marker", default_value="false"),
-            DeclareLaunchArgument("perception_backend", default_value="m2h"),
+            DeclareLaunchArgument("perception_backend", default_value="torch"),
             DeclareLaunchArgument(
                 "perception_dataset", default_value="itc",
                 choices=["itc", "scannet", "nyud", "nyudv2"],
@@ -41,8 +41,8 @@ def generate_launch_description():
             DeclareLaunchArgument("ptc_python_path", default_value=os.environ.get("PTC_DEPTH_PYTHONPATH", "")),
             DeclareLaunchArgument("ptc_width", default_value="424"),
             DeclareLaunchArgument("ptc_references", default_value="1"),
-            DeclareLaunchArgument("revision_fusion_weighting", default_value="false"),
-            DeclareLaunchArgument("revision_object_association", default_value="false"),
+            DeclareLaunchArgument("revision_fusion_weighting", default_value="true"),
+            DeclareLaunchArgument("revision_object_association", default_value="true"),
             DeclareLaunchArgument("hydra_extra_yaml", default_value="{}"),
             DeclareLaunchArgument("ptc_local", default_value="true"),
             DeclareLaunchArgument("ptc_max_scale_change", default_value="0.10"),
@@ -56,14 +56,15 @@ def generate_launch_description():
             DeclareLaunchArgument("perception_image_width", default_value="0"),
             DeclareLaunchArgument("perception_config_path", default_value=""),
             DeclareLaunchArgument("perception_checkpoint_path", default_value=""),
-            DeclareLaunchArgument("use_temporal_alignment", default_value="false"),
+            DeclareLaunchArgument("use_sparse_depth_factors", default_value="true"),
+            DeclareLaunchArgument("use_temporal_alignment", default_value="true"),
             DeclareLaunchArgument("temporal_history_size", default_value="3"),
             DeclareLaunchArgument("temporal_max_history_age_s", default_value="0.5"),
             DeclareLaunchArgument("temporal_depth_gate_abs", default_value="0.30"),
             DeclareLaunchArgument("temporal_depth_gate_rel", default_value="0.05"),
             DeclareLaunchArgument("temporal_depth_fusion_mode", default_value="median"),
             DeclareLaunchArgument("temporal_label_min_votes", default_value="2"),
-            DeclareLaunchArgument("temporal_fuse_labels", default_value="false"),
+            DeclareLaunchArgument("temporal_fuse_labels", default_value="true"),
             DeclareLaunchArgument(
                 "kimera_left_cam_topic", default_value="/mono_hydra_perception/synced/image_raw"
             ),
@@ -218,7 +219,7 @@ def generate_launch_description():
                     "temporal_camera_info_topic": "/mono_hydra_perception/synced/camera_info",
                     "use_rvio2_bridge": LaunchConfiguration("use_rvio2_bridge"),
                     "use_rvio2_backend": LaunchConfiguration("use_rvio2_backend"),
-                    "use_sparse_depth_factors": "false",
+                    "use_sparse_depth_factors": LaunchConfiguration("use_sparse_depth_factors"),
                     "rvio2_mono_image_topic": "/rvio2_bridge/cam0/image_raw",
                     "rvio2_config_path": PathJoinSubstitution(
                         [FindPackageShare("mono_hydra_vio"), "config", "itc_realsense_848x480.yaml"]

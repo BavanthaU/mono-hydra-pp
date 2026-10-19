@@ -6,8 +6,7 @@ semantic model. No replacement model or weights are installed.
 
 PTC is an optional experiment, disabled by default. It receives synchronized raw
 M2H predictions and camera poses on a separate Hydra-only branch. Kimera still
-receives raw M2H depth and publishes loop edges to Hydra PGMO. The old blocking
-temporal filter must remain disabled.
+receives raw M2H depth and publishes loop edges to Hydra PGMO. Set `use_temporal_alignment:=false` when enabling PTC.
 
 ## Install and build
 

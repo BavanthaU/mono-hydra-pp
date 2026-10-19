@@ -596,6 +596,12 @@ class KimeraVioRos2Node : public rclcpp::Node {
           params_folder_path_, sensor_params_folder_path_);
     }
 
+    vio_params_->backend_params_->use_sparse_depth_factors_ = getOrDeclare<bool>(
+        "use_sparse_depth_factors",
+        vio_params_->backend_params_->use_sparse_depth_factors_);
+    RCLCPP_INFO(get_logger(), "Sparse depth factors: %s",
+                vio_params_->backend_params_->use_sparse_depth_factors_ ? "on" : "off");
+
     std::unique_ptr<VIO::PreloadedVocab> preloaded_vocab;
     if (FLAGS_use_lcd) {
       preloaded_vocab = std::make_unique<VIO::PreloadedVocab>();

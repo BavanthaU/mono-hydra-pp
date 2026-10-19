@@ -4,110 +4,26 @@
 
 **Monocular 3D scene graphs from RGB and IMU**
 
-ROS 2 Jazzy · RVIO2–SuperPoint · M2H perception · Hydra mapping
+ROS 2 Jazzy · RVIO2–SuperPoint · M2H-MX · Hydra
 
-[Paper](https://arxiv.org/abs/2605.17661) · [Release](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/mono_hydrapp_v1.0) · [Journal figures](#journal-method-figures) · [ITC quick start](ITC_REVISION.md) · [SuperPoint setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking) · [PTC on/off](ITC_REVISION.md#switch-ptc-on-or-off) · [License](LICENSE)
+[Paper](https://arxiv.org/abs/2605.17661) · [Code version](https://github.com/BavanthaU/mono-hydra-pp/tree/mono_hydrapp_v1.0) · [Setup](#setup) · [Run ITC](#run-itc) · [Component switches](#component-switches) · [Citation](#bibliography-and-citation)
 
 </div>
 
-Mono Hydra++ turns monocular RGB and IMU observations into a semantic mesh and
-a layered 3D scene graph. The ITC flow uses SuperPoint dense tracking
-inside R-VIO2, learned metric depth and semantics from M2H, and Kimera loop
-proposals consumed by the MIT SPARK Hydra backend.
+Mono Hydra++ combines visual–inertial odometry, learned metric depth and
+semantics, local geometric refinement, and Hydra mapping to build semantic
+meshes and layered 3D scene graphs.
 
-[![System overview from the revised journal manuscript: RGB and IMU feed SuperPoint-guided RVIO2 and M2H-MX perception, followed by local refinement, temporal alignment, and Hydra scene-graph mapping.](images/system_overview_journal_v14.png)](images/system_overview_journal_v14.png)
+![Mono Hydra++ pipeline](images/system_overview_journal_v14.png)
 
-*System overview from the revised journal manuscript. Click the figure for full
-resolution. The [ITC guide](ITC_REVISION.md) specifies the active components and
-optional switches for the published launch preset.*
+The ITC launch enables RVIO2–SuperPoint tracking, M2H-MX perception, temporal
+alignment, sparse depth factors, geometric reliability weighting, temporal
+object association, and Kimera loop closure with Hydra PGMO. Use the
+[component switches](#component-switches) to adjust the pipeline.
 
-## Updated code
+## Setup
 
-The updated code includes RVIO2–SuperPoint tracking, M2H perception, and Hydra
-mapping. The [ITC run guide](ITC_REVISION.md) covers setup, the two-terminal
-workflow, and optional components.
-
-For the ISPRS paper code version, use [mono_hydrapp_v1.0](https://github.com/BavanthaU/mono-hydra-pp/releases/tag/mono_hydrapp_v1.0).
-See [Reproducibility](REPRODUCIBILITY.md) for checkout commands and checksums.
-
-| Main flow | Optional tests and fallbacks |
-| --- | --- |
-| RVIO2–SuperPoint dense tracking | Classical RVIO2 with `rvio2_variant:=classical` |
-| M2H-HMX depth and semantics | Additional perception backends remain available |
-| Kimera visual LCD → Hydra PGMO | Separate Hydra LCD switch for ablations |
-| Robust TSDF integration | Geometric reliability and temporal object association |
-| Raw M2H depth into Hydra | PTC refinement, disabled by default |
-
-<details>
-<summary>ITC runtime flow and optional PTC branch</summary>
-
-```mermaid
-flowchart LR
-    camera[RGB + IMU] --> vio[RVIO2 + SuperPoint]
-    camera --> perception[M2H depth + semantics]
-    vio --> kimera[Kimera pose graph + visual LCD]
-    perception --> kimera
-    perception --> hydra[Hydra + PGMO]
-    kimera --> hydra
-    perception -. Optional PTC refinement .-> ptc[Pose-guided depth correction]
-    vio -. Camera pose .-> ptc
-    ptc -. Replaces raw depth input when enabled .-> hydra
-    hydra --> mesh[Semantic mesh]
-    hydra --> graph[Objects · Places · Rooms · Building]
-```
-
-</details>
-
-## Journal method figures
-
-The figures below illustrate temporal alignment, depth-sample selection, and
-local depth-factor geometry in the revised manuscript. The current ITC
-quick-start preset disables temporal alignment and sparse depth factors.
-[Optional PTC refinement](ITC_REVISION.md#switch-ptc-on-or-off) is a separate
-path and remains off by default.
-
-<details>
-<summary><strong>Temporal alignment</strong> — warp, gate, and fuse depth and labels</summary>
-
-[![Temporal alignment: RVIO2 relative poses warp stored depth and labels into the current view; consistency and validity gates select history for fusion.](images/temporal_alignment_journal_v14.png)](images/temporal_alignment_journal_v14.png)
-
-*Historical observations are back-projected, transformed, and reprojected into
-the current image. Accepted history is combined with the current prediction.*
-
-</details>
-
-<details>
-<summary><strong>Depth sampling</strong> — select measurements for local graph refinement</summary>
-
-[![Depth sampling: aligned depth is sampled at tracked keypoints, filtered using validity, motion, reprojection, and semantic criteria, then used as depth factors.](images/depth_sampling_journal_v5.png)](images/depth_sampling_journal_v5.png)
-
-*Candidate depth samples are checked before entering the local graph alongside
-visual, motion, and IMU constraints.*
-
-</details>
-
-<details>
-<summary><strong>Depth-factor geometry</strong> — connect a camera-frame measurement to a landmark</summary>
-
-[![Depth-factor geometry: camera-frame depth along the optical axis and the corresponding pose-landmark factor in a local graph with visual, IMU, and RVIO2 motion constraints.](images/depth_factor_geometry_journal_v3.png)](images/depth_factor_geometry_journal_v3.png)
-
-*The measurement diagram relates the observed pixel and landmark to camera-frame
-depth; the graph shows how that sample connects the current pose and landmark.*
-
-</details>
-
-## Repository Layout
-
-```text
-mono_hydra              launch, dataset mappings, Hydra wiring, RViz
-mono_hydra_vio          custom R-VIO2 + pose-graph/LCD VIO module
-mono_hydra_perception   M2H-HMX-Large PyTorch/ONNX perception interface
-mono_hydra_utils        vendored Hydra, Spark-DSG, Kimera-PGMO/RPGO, tools
-images                  paper and README figures
-```
-
-This repository is intended to be cloned as the `src/` directory of a ROS 2
-workspace:
+Use Ubuntu 24.04 with ROS 2 Jazzy. Create a workspace:
 
 ```bash
 mkdir -p ~/mono_hydra_ros2_ws
@@ -115,150 +31,141 @@ cd ~/mono_hydra_ros2_ws
 git clone https://github.com/BavanthaU/mono-hydra-pp.git src
 ```
 
-Third-party source is vendored under `mono_hydra_utils`; no Git submodules are required.
-The recorded upstream revisions are listed in [UPSTREAM_REPOS.md](UPSTREAM_REPOS.md).
+### Model weights
 
-## Pipeline
+Download [M2H-MX checkpoints](https://huggingface.co/Bavantha11/m2h-mx) or
+[ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights).
+Choose **ScanNet** or **NYUDv2** weights for your scene, and set
+`perception_dataset:=scannet` or `perception_dataset:=nyudv2` to match.
 
-```text
-RGB + IMU
-  -> R-VIO2 + SuperPoint dense tracking
-  -> /rvio2/trajectory
-  -> /external_odometry and /mono_hydra_vio/odometry
-  -> mono_hydra_vio RGB-D/external-odometry pose graph
-  -> loop-closure proposals following the Kimera LCD formulation
-  -> Hydra GraphBuilder + Kimera-PGMO/Kimera-RPGO backend
-  -> optimized mesh, rooms, objects, places, building, and 3D scene graph
-```
-
-The perception package publishes learned metric depth and semantic label IDs:
-
-```text
-/camera/depth_cam/image_raw        sensor_msgs/Image, 32FC1
-/camera/seg_cam/labels_argmax      sensor_msgs/Image, mono8
-/mono_hydra_perception/synced/*    RGB/CameraInfo paired with each prediction
-```
-
-## Model Weights
-
-Download [M2H-MX checkpoints](https://huggingface.co/Bavantha11/m2h-mx) and
-[ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights) from Hugging Face.
-
-Choose the **ScanNet** or **NYUDv2** weights for your scene and set the matching
-`perception_dataset:=scannet` or `perception_dataset:=nyudv2`.
-
-Place local checkpoints under these paths inside this repository:
-
-```text
-mono_hydra_perception/weights/
-mono_hydra_perception/onnx_models/
-```
-
-or pass them explicitly:
-
-```bash
-ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  perception_backend:=torch perception_checkpoint_path:=/path/to/m2h_hmx_large.pt
-```
-
-Loop-closure detection also needs the ORB vocabulary installed locally. The
-archive and expanded vocabulary are intentionally ignored by Git:
+Complete the [SuperPoint model and ONNX Runtime setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking),
+then download the loop-closure vocabulary:
 
 ```bash
 src/mono_hydra_vio/scripts/download_orb_vocabulary.sh
 ```
 
-## Build
+### Build
 
-The ITC flow uses RVIO2–SuperPoint. Complete its
-[model and ONNX Runtime setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking)
-before building. For a classical-only build, pass
-`--cmake-args -DMONO_HYDRA_BUILD_RVIO2_SP=OFF` and use
-`rvio2_variant:=classical` when launching.
-
-Use a modest build load for workstation thermals:
+From the workspace root:
 
 ```bash
-cd ~/mono_hydra_ros2_ws
 source /opt/ros/jazzy/setup.bash
 rosdep install --from-paths src src/mono_hydra_perception/mavista --ignore-src -r -y
 MAKEFLAGS="-j2" colcon build --base-paths src src/mono_hydra_perception/mavista \
-  --symlink-install --continue-on-error \
-  --parallel-workers 2
+  --symlink-install --parallel-workers 2
 source install/setup.bash
 ```
 
-## ITC Full-Loop Run
+## Run ITC
 
-Convert the ROS 1 ITC bag once:
+Convert the ROS 1 bag once:
 
 ```bash
 src/mono_hydra_utils/mono_hydra_utils/scripts/convert_itc_ros1_bag_to_ros2.sh \
   /path/to/ITC_2nd_floor_full_loop.bag
 ```
 
-Terminal 1:
+**Terminal 1 — start the pipeline.** Select your downloaded checkpoint and its
+dataset preset; this example uses ScanNet:
 
 ```bash
 cd ~/mono_hydra_ros2_ws
+source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  sequence_name:=itc_full_loop use_rviz:=true perception_backend:=torch \
-  rvio2_variant:=superpoint use_ptc_refinement:=false
+  sequence_name:=itc_full_loop \
+  perception_dataset:=scannet \
+  perception_checkpoint_path:=/path/to/m2h_mx_large_scannet.pt
 ```
 
-Terminal 2:
+**Terminal 2 — play the bag:**
 
 ```bash
 cd ~/mono_hydra_ros2_ws
+source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 bag play test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2 \
-  --clock --qos-profile-overrides-path \
-  "$(ros2 pkg prefix mono_hydra_utils)/share/mono_hydra_utils/config/tf_overrides.yaml" \
-  --remap /tf:=/tf_ignore /tf_static:=/tf_static_ignore
+src/mono_hydra_utils/mono_hydra_utils/scripts/play_itc_full_loop_ros2.sh
 ```
 
-The reference runs use normal bag timing. ONNX inference remains available only
-when explicitly requested:
+Playback starts paused. Wait for initialization, then press **Space**. After the
+bag finishes, let processing drain, then press **Ctrl-C** once in terminal 1
+and wait for export. Outputs are saved under `output/itc_full_loop/`.
+Use a new `sequence_name` for each run. See the [ITC guide](ITC_REVISION.md) for
+model options, output settings, and PTC setup.
+
+## Component switches
+
+The paper components are **on by default** in the ITC launch. Append any of
+these arguments to the launch command to change the configuration:
+
+| Component | Default | Launch argument |
+| --- | --- | --- |
+| RVIO2–SuperPoint tracking | SuperPoint dense | `rvio2_variant:=superpoint` / `classical` |
+| M2H-MX perception | PyTorch | `perception_backend:=torch` / `onnx` |
+| Temporal depth alignment | On | `use_temporal_alignment:=true` / `false` |
+| Temporal label fusion | On | `temporal_fuse_labels:=true` / `false` |
+| Sparse depth factors | On | `use_sparse_depth_factors:=true` / `false` |
+| Semantic feature masking | On | `use_semantic_masking:=true` / `false` |
+| Geometric reliability weighting | On | `revision_fusion_weighting:=true` / `false` |
+| Temporal object association | On | `revision_object_association:=true` / `false` |
+| Kimera visual loop closure | On | `enable_lcd:=true` / `false` |
+| Hydra semantic loop detector | Off | `enable_hydra_lcd:=true` / `false` |
+| PTC refinement | Off, optional | `use_ptc_refinement:=true` / `false` |
+
+For example, disable temporal alignment and sparse depth factors:
 
 ```bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
-  perception_backend:=onnx onnx_model_path:=/path/to/model.onnx
+  perception_dataset:=scannet \
+  perception_checkpoint_path:=/path/to/m2h_mx_large_scannet.pt \
+  use_temporal_alignment:=false use_sparse_depth_factors:=false
 ```
 
-## Other Dataset Launches
+For PTC, follow [installation and switching instructions](ITC_REVISION.md#switch-ptc-on-or-off)
+and use `use_ptc_refinement:=true use_temporal_alignment:=false`.
 
-```bash
-ros2 launch mono_hydra mono_hydra_7scenes.launch.py \
-  use_rviz:=true perception_backend:=torch
+## Pipeline components
 
-ros2 launch mono_hydra mono_hydra_uhumans.launch.py \
-  use_rviz:=true perception_backend:=torch use_sparse_depth_factors:=true
+### Temporal alignment
 
-ros2 launch mono_hydra mono_hydra_scannet.launch.py \
-  use_rviz:=true perception_backend:=torch
-```
+Past depth and label predictions are warped into the current camera frame.
+Visibility and consistency gates select observations for depth and label fusion.
+Control this stage with `use_temporal_alignment` and `temporal_fuse_labels`.
 
-Useful ablation switches:
+![Temporal alignment and fusion](images/temporal_alignment_journal_v14.png)
 
-```text
-use_sparse_depth_factors
-use_semantic_masking
-superpoint_keypoint_mask_topic
-use_temporal_alignment
-kimera_do_coarse_imu_camera_temporal_sync
-kimera_do_fine_imu_camera_temporal_sync
-```
+### Depth sampling and local refinement
+
+Depth at tracked keypoints is filtered by geometry and semantics before it
+contributes to the local optimization. `use_sparse_depth_factors` controls the
+depth constraints; `use_semantic_masking` controls semantic feature filtering.
+
+![Depth sampling and filtering](images/depth_sampling_journal_v5.png)
+
+The depth factor relates a camera-frame depth measurement to a landmark and
+camera pose, alongside visual, IMU, and RVIO2 motion constraints.
+
+![Depth-factor geometry](images/depth_factor_geometry_journal_v3.png)
+
+### Mapping and loop closure
+
+Hydra integrates depth and semantics into the mesh and scene graph.
+`revision_fusion_weighting` applies geometric consistency weights during TSDF
+integration. `revision_object_association` enables temporal object association.
+Kimera supplies visual loop closures to Hydra PGMO with `enable_lcd:=true`.
+See [mapping parameters](mono_hydra/JOURNAL_REVISION.md) for tuning options.
+
+## Code version
+
+The ISPRS paper version is tagged **`mono_hydrapp_v1.0`**.
+[Checkout and checksum instructions](REPRODUCIBILITY.md) describe how to use
+that version with the matching model files.
 
 ## License
 
-The original Mono Hydra ROS 2 integration code in this repository is released
-under the MIT License; see [LICENSE](LICENSE). This does not relicense vendored
-upstream code. MIT SPARK Hydra and the other third-party projects under
-`mono_hydra_utils`, plus R-VIO2/vocabulary-derived components under
-`mono_hydra_vio`, retain their upstream licenses. See
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the license files in each
-vendored source directory.
+[MIT](LICENSE) for the Mono Hydra integration. Third-party components retain
+their respective licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Acknowledgements
 

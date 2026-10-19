@@ -39,8 +39,6 @@ def generate_launch_description():
                     "use_kimera_vio_ros_node": "true",
                     "use_kimera_pose_graph_bridge": "true",
                     "use_vio_feature_interface": "true",
-                    "use_temporal_alignment": "false",
-                    "use_sparse_depth_factors": "false",
                     "start_mesh_marker": "false",
                     "use_rviz": "false",
                     "visualize": "false",

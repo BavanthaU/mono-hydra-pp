@@ -1,46 +1,29 @@
-# ITC setup and optional components
+# ITC setup and component switches
 
-Run the updated code with the following setup and component switches.
+Follow the [setup and build instructions](README.md#setup), then run from the
+workspace root.
 
-## Scope
+## Run ITC
 
-- Timestamp-preserving M2H inputs, bounded perception queues, and optional
-  latest-frame inference scheduling.
-- Robust TSDF influence, object geometry/remapping fixes, and optional
-  geometric reliability and temporal object association.
-- Independent Kimera/Hydra LCD switches, detection-only Kimera loop reporting,
-  and complete shutdown exports to Hydra PGMO.
-- RVIO2–SuperPoint dense tracking as the main ITC flow, with classical RVIO2
-  available as a fallback. PTC refinement and MAViSTA remain optional.
-
-The ITC launcher includes `mono_hydra_scannet.launch.py`: despite that filename,
-it implements the shared perception/VIO/Hydra wiring required by ITC. Shared
-semantic mappings also support optional model presets on the ITC sensor stream.
-Separate ScanNet/7 Scenes workflows and experiment results are outside this
-update. Existing dataset support in the repository is retained.
-
-## Run the main ITC RVIO2–SuperPoint + M2H-HMX flow
-
-First follow the [SuperPoint build and model setup](mono_hydra_vio/README.md#rvio2-sp-superpoint-guided-tracking).
-The SuperPoint ONNX file and ONNX Runtime headers/libraries must be supplied
-locally before building. From the workspace root, start terminal 1:
+Terminal 1, using a ScanNet checkpoint:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
   sequence_name:=itc_$(date +%Y%m%d_%H%M%S) \
-  rvio2_variant:=superpoint rvio2_sp_tracker_method:=2 rvio2_sp_detector:=1 \
-  perception_backend:=torch perception_dataset:=itc \
-  perception_skip_frequency:=3 perception_target_fps:=0.0 \
-  perception_preserve_aspect_ratio:=false use_temporal_alignment:=false \
-  use_ptc_refinement:=false \
-  revision_fusion_weighting:=false revision_object_association:=false \
-  enable_lcd:=true enable_hydra_lcd:=false kimera_lcd_no_optimize:=true \
-  hydra_exit_after_clock:=false use_rviz:=true
+  perception_dataset:=scannet \
+  perception_checkpoint_path:=/path/to/m2h_mx_large_scannet.pt
 ```
 
-Terminal 2, from the same workspace:
+For NYUDv2, use `perception_dataset:=nyudv2` with its matching checkpoint.
+Download [checkpoints](https://huggingface.co/Bavantha11/m2h-mx) or
+[ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights).
+For a local ITC checkpoint, select `perception_dataset:=itc`.
+Pass `perception_config_path:=/path/to/config.yml` when using a model
+configuration other than the preset's default Large model.
+
+Terminal 2:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -48,79 +31,75 @@ source install/setup.bash
 src/mono_hydra_utils/mono_hydra_utils/scripts/play_itc_full_loop_ros2.sh
 ```
 
-The helper expects the converted ITC full-loop bag under
-`test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2`. It starts paused; wait for
-initialization, then press Space. After playback, allow about 45 seconds for
-processing to drain, press Ctrl-C once in terminal 1, and wait for clean export.
+The playback helper reads
+`test_data/itc_ros2_bags/ITC_2nd_floor_full_loop_ros2`. Press **Space** after
+initialization. After playback, allow about 45 seconds for processing to drain,
+press **Ctrl-C** once in terminal 1, and wait for export.
 
-The explicit `torch` argument selects M2H-HMX. Omitting it uses the older M2H
-launch default. Place checkpoints locally as described in the main README.
-Model downloads: [M2H-MX checkpoints](https://huggingface.co/Bavantha11/m2h-mx)
-and [ONNX exports](https://huggingface.co/Bavantha11/vio-stack-jetson-weights).
-Choose ScanNet or NYUDv2 weights for your scene. In the command above, replace
-`perception_dataset:=itc` with `perception_dataset:=scannet` or
-`perception_dataset:=nyudv2`, and set
-`perception_checkpoint_path:=/path/to/the/matching_weights.pt`.
+Results are saved under `output/<sequence_name>/`. Set
+`output_root:=/path/to/results` to choose another location.
 
-## Optional components
+## Default components
 
-For reliability weighting and temporal object association, append
-`revision_fusion_weighting:=true revision_object_association:=true`.
-Their algorithms, parameters, and limitations are documented in
-[JOURNAL_REVISION.md](mono_hydra/JOURNAL_REVISION.md).
+RVIO2–SuperPoint, M2H-MX, temporal depth alignment, temporal label fusion,
+sparse depth factors, semantic feature masking, geometric reliability weighting,
+temporal object association, and Kimera visual loop closure are enabled by
+default. The [switch table](README.md#component-switches) lists the controls.
+
+Append `:=false` to a boolean switch to disable that component, or `:=true` to
+enable it. Restart with a new `sequence_name` when changing settings. For example:
+
+```bash
+ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
+  sequence_name:=itc_no_depth_factors \
+  perception_dataset:=scannet \
+  perception_checkpoint_path:=/path/to/m2h_mx_large_scannet.pt \
+  use_sparse_depth_factors:=false
+```
+
+### Temporal alignment settings
+
+| Argument | Default | Purpose |
+| --- | --- | --- |
+| `temporal_history_size` | `3` | Number of historical observations |
+| `temporal_max_history_age_s` | `0.5` | Maximum history age in seconds |
+| `temporal_depth_gate_abs` | `0.30` | Absolute depth-consistency gate in metres |
+| `temporal_depth_gate_rel` | `0.05` | Relative depth-consistency gate |
+| `temporal_depth_fusion_mode` | `median` | Depth fusion rule |
+| `temporal_label_min_votes` | `2` | Minimum votes for label fusion |
 
 ### Switch PTC on or off
 
-PTC is disabled by default and remains an optional test. Install it once from
-the workspace root:
+PTC is an optional test and defaults to **off**. Install it from the workspace root:
 
 ```bash
 bash src/mono_hydra_perception/scripts/install_ptc_depth.sh
 # Source the env.sh path printed by the installer in terminal 1.
 ```
 
-In the main terminal-1 command above, replace `use_ptc_refinement:=false` with
-this block to turn on single-reference PTC:
+Enable PTC in place of temporal alignment:
 
 ```bash
-  use_ptc_refinement:=true ptc_python_path:="$PTC_DEPTH_PYTHONPATH" \
-  ptc_width:=424 ptc_local:=true ptc_max_scale_change:=0.10 ptc_references:=1 \
+ros2 launch mono_hydra mono_hydra_itc_rosbag.launch.py \
+  sequence_name:=itc_ptc \
+  perception_dataset:=scannet \
+  perception_checkpoint_path:=/path/to/m2h_mx_large_scannet.pt \
+  use_ptc_refinement:=true use_temporal_alignment:=false \
+  ptc_python_path:="$PTC_DEPTH_PYTHONPATH" \
+  ptc_width:=424 ptc_local:=true ptc_max_scale_change:=0.10 ptc_references:=1
 ```
 
-Set `ptc_references:=2` for the experimental two-reference test. Keep
-`use_temporal_alignment:=false`. The bag playback command is identical.
+Use `ptc_references:=2` for the experimental two-reference mode. To return to
+the default pipeline, restart with
+`use_ptc_refinement:=false use_temporal_alignment:=true`.
+See [PTC setup](mono_hydra_perception/PTC_REFINEMENT.md) for more options.
 
-To turn PTC off, stop the launch cleanly, choose a new `sequence_name`, and
-restart with `use_ptc_refinement:=false`. No uninstall or rebuild is required.
-`perception_target_fps:=0.0` preserves the original frame-skipping scheduler;
-it is independent of whether PTC is enabled. Detailed installation, adapter
-behavior, and limitations are in [PTC_REFINEMENT.md](mono_hydra_perception/PTC_REFINEMENT.md).
+### Frontend and inference options
 
-| Component | Main flow | Switch / fallback |
-| --- | --- | --- |
-| RVIO2 frontend | SuperPoint dense | `rvio2_variant:=classical` restores classical tracking |
-| PTC | Off | `use_ptc_refinement:=true` after installation; `false` disables it |
-| PTC references | One when enabled | `ptc_references:=2` enables the experimental pair |
-| Reliability weighting | Off | `revision_fusion_weighting:=true` / `false` |
-| Temporal object association | Off | `revision_object_association:=true` / `false` |
-| Latest-frame scheduler | Off | `perception_target_fps:=5.0`; `0.0` restores frame skipping |
-
-For a classical-only build, use `-DMONO_HYDRA_BUILD_RVIO2_SP=OFF` and explicitly
-launch with `rvio2_variant:=classical`. MAViSTA has a separate
-[ITC guide](run_guide_mavista.md).
-
-## Validation scope
-
-Checks on 2026-10-19 passed:
-
-- 17 Python tests covering perception scheduling, label mapping, native PTC
-  adapters, and MAViSTA geometry.
-- 19 rebuilt Hydra tests covering robust fusion, geometric reliability, mesh
-  clustering, and object association.
-- Builds of the RVIO2–SuperPoint and Kimera nodes in the existing workspace;
-  launch/perception/MAViSTA package builds from the release checkout.
-- 12 launch combinations covering the default, SuperPoint, and classical
-  frontend selections with PTC and revision switches on/off; source syntax
-  and whitespace checks.
-These are implementation checks; no complete ITC replay or manuscript metric
-reproduction is implied by this code update.
+- Classical RVIO2: `rvio2_variant:=classical`. For a classical-only build,
+  pass `--cmake-args -DMONO_HYDRA_BUILD_RVIO2_SP=OFF` to `colcon build`.
+- ONNX: `perception_backend:=onnx perception_dataset:=itc
+  onnx_model_path:=/path/to/model.onnx`. Use an export with the ITC label mapping.
+- Latest-frame inference: `perception_target_fps:=5.0`. The default `0.0`
+  uses frame skipping with `perception_skip_frequency:=3`.
+- Mapping: see [geometric reliability and object association settings](mono_hydra/JOURNAL_REVISION.md).

@@ -81,9 +81,10 @@ If the camera's raw stream is distorted, run `image_proc` and pass its
 rectified image and matching CameraInfo topics instead. The node uses the
 input CameraInfo `P` matrix when valid and never substitutes NYUv2 intrinsics.
 
-ITC defaults to `perception_backend:=m2h` because the benchmarked ROS 1 ITC
-stack used the original `m2h` package with `m2h_indoor.pt`. HMX-Large and ONNX
-remain explicit overrides for research and inference checks.
+ITC defaults to `perception_backend:=torch` with RVIO2–SuperPoint, temporal
+alignment, depth factors, geometric reliability weighting, and temporal object
+association enabled. See the [ITC guide](../ITC_REVISION.md) for commands and
+[component switches](../README.md#component-switches).
 
 ## Runtime Graph
 
@@ -94,16 +95,15 @@ RGB + CameraInfo -> MAViSTA -> learned depth + semantic labels
 original RGB + CameraInfo + depth + labels + pose graph + LC proposals + TF -> hydra_ros -> DSG outputs
 ```
 
-Hydra LCD is enabled by default. The benchmarked RVIO2 + Kimera flow is kept as
-the source of truth: loop closures come from Kimera VIO LCD pose graph outputs,
-and final loop-closure optimization is delegated to the official Hydra ROS 2
-backend using Kimera-PGMO and Kimera-RPGO.
+The ITC flow enables Kimera visual loop closure (`enable_lcd:=true`) and Hydra
+PGMO optimization. The separate Hydra semantic detector can be selected with
+`enable_hydra_lcd:=true`.
 
 ## Dataset Mapping
 
 | Dataset | Perception | Pose source | Label space |
 | --- | --- | --- | --- |
-| ITC | original M2H `m2h_indoor.pt` | R-VIO2 | NYUD20 |
+| ITC | M2H-MX, selected checkpoint | RVIO2–SuperPoint | Match checkpoint preset |
 | uHumans2 office | M2H-HMX-Large NYUD | R-VIO2 | NYUD20 |
 | 7Scenes | M2H-HMX-Large ScanNet | dataset odometry until calibrated R-VIO2 config is added | ScanNet20 |
 | ScanNet | M2H-HMX-Large ScanNet | dataset odometry or supplied R-VIO2 bridge | ScanNet20 |

@@ -1024,6 +1024,9 @@ def generate_launch_description():
                 "sensor_params_folder_path": LaunchConfiguration("kimera_sensor_params_folder"),
                 "use_lcd": ParameterValue(LaunchConfiguration("enable_kimera_lcd"), value_type=bool),
                 "use_external_odom": ParameterValue(LaunchConfiguration("kimera_use_external_odom"), value_type=bool),
+                "use_sparse_depth_factors": ParameterValue(
+                    LaunchConfiguration("use_sparse_depth_factors"), value_type=bool
+                ),
                 "lcd_no_optimize": ParameterValue(LaunchConfiguration("kimera_lcd_no_optimize"), value_type=bool),
                 "lcd_no_detection": ParameterValue(LaunchConfiguration("kimera_lcd_no_detection"), value_type=bool),
                 "lcd_disable_stereo_match_depth_check": ParameterValue(

@@ -73,14 +73,7 @@ on/off commands. Matching results also requires the same input bag, calibration,
 model artifacts, and runtime dependencies. This is a source release, not a
 container image or a complete experiment archive.
 
-## Validation and citation
+## Citation
 
-The implementation matches commit
-`5a7ef2fc47d64c2839e062d3258c95d0506d87ed`; release preparation adds documentation
-and artifact manifests. Prior checks passed 17 Python tests, 19 Hydra tests,
-12 launch combinations, and the builds listed in the [ITC guide](ITC_REVISION.md#validation-scope).
-The full dataset experiments were not rerun during release preparation.
-
-In reproducibility notes, record the release tag, the full source commit from
-the manifest, and the model hashes. Cite the relevant
-[papers](README.md#bibliography-and-citation).
+Record the release tag, source commit, and model hashes with your experiment.
+Cite the relevant [papers](README.md#bibliography-and-citation).
