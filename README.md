@@ -287,27 +287,27 @@ and mapping papers below, alongside the upstream systems acknowledged above.
    *Mono-Hydra++: Real-Time Monocular Scene Graph Construction with Multi-Task
    Learning for 3D Indoor Mapping.* 2026. Under review at the **ISPRS Journal of
    Photogrammetry and Remote Sensing**; revised manuscript submitted following
-   the first review cycle. [Preprint](https://arxiv.org/abs/2605.17661).
+   the first review cycle. [Paper](https://arxiv.org/abs/2605.17661).
 
 2. **M2H-MX** — U. V. B. L. Udugama, George Vosselman, and Francesco Nex.
    *M2H-MX: Multi-Task Semantic and Geometric Perception for Real-Time Monocular
    3D Scene Graph Construction.* **ICRA 2026, SRRA Workshop**, 2026 (accepted).
    [Publication details](https://bavanthau.github.io/publications/)
-   · [Preprint](https://arxiv.org/abs/2603.29236).
+   · [Paper](https://arxiv.org/abs/2603.29236).
 
 3. **M2H** — U. V. B. L. Udugama, George Vosselman, and Francesco Nex.
    *M2H: Multi-Task Learning with Efficient Window-Based Cross-Task Attention
    for Monocular Spatial Perception.* **IEEE/RSJ International Conference on
    Intelligent Robots and Systems (IROS)**, 2025.
    [DOI](https://doi.org/10.1109/IROS60139.2025.11246974)
-   · [Preprint](https://arxiv.org/abs/2510.17363).
+   · [Paper](https://arxiv.org/abs/2510.17363).
 
 4. **Mono-Hydra** — U. V. B. L. Udugama, G. Vosselman, and F. Nex.
    *Mono-Hydra: Real-Time 3D Scene Graph Construction from Monocular Camera
    Input with IMU.* **ISPRS Annals of the Photogrammetry, Remote Sensing and
    Spatial Information Sciences**, X-1/W1-2023, 439–445, 2023.
    [DOI](https://doi.org/10.5194/isprs-annals-X-1-W1-2023-439-2023)
-   · [Preprint](https://arxiv.org/abs/2308.05515).
+   · [Paper](https://arxiv.org/abs/2308.05515).
 
 <details>
 <summary><strong>BibTeX — copy the relevant entries</strong></summary>
